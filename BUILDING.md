@@ -100,6 +100,17 @@ and no hardware validation. To flash an alpha you need the stock/UBOOT path and 
 way to recover; read [HARDWARE.md](HARDWARE.md) and the Felucca recovery notes
 before trying. Installing custom firmware is at your own risk.
 
+## Lab image (runtime profiles / measurement)
+
+```sh
+REED_LAB=1 ./firmware/build.sh   # firmware/build-lab/reed-lab.bin
+```
+
+The lab image adds a USB-CDC console and USB audio capture (44.1 kHz) and exposes
+voice count, modes, pickup, noise, drag, chain and master at runtime. Profiles are
+session-only. See [docs/LAB.md](docs/LAB.md) and [web/lab.html](web/lab.html).
+The capture runner is `tools/lab/run_profiles.py` (WIP: song/hardware pending).
+
 ## Regenerating the tables
 
 ```sh

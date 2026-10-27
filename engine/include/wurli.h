@@ -24,11 +24,33 @@ extern "C" {
 
 #define WR_SR 44100
 #define WR_BLOCK 32
-/* Polyphony budget. 8 is the v0.1 device budget; it can be raised at compile
- * time (-DWR_MAX_VOICES=10) once the FM-1 render time is measured. */
+/* Voice capacity. The runtime limit (wr_set_voice_limit / profile.voices)
+ * defaults to 8; the array has room for 32 so the lab build can measure higher
+ * counts without recompiling. Inactive slots cost RAM, not CPU. */
 #ifndef WR_MAX_VOICES
-#define WR_MAX_VOICES 8
+#define WR_MAX_VOICES 32
 #endif
+#define WR_DEFAULT_VOICES 8
+
+enum {
+    WR_PICKUP_FULL = 0,
+    WR_PICKUP_LITE = 1
+};
+enum {
+    WR_CHAIN_FULL = 0,
+    WR_CHAIN_LITE = 1
+};
+
+/* A voice-quality/polyphony profile. It applies to notes started after the
+ * change; existing voices keep the modes/pickup/noise/drag they started with. */
+typedef struct {
+    uint8_t voices;   /* active voice ceiling, 1..WR_MAX_VOICES */
+    uint8_t modes;    /* modal modes per voice, 1..WR_NMODES */
+    uint8_t pickup;   /* WR_PICKUP_FULL / WR_PICKUP_LITE */
+    uint8_t noise;    /* hammer attack noise, 0/1 */
+    uint8_t drag;     /* amplitude-dependent air drag, 0/1 */
+    uint8_t chain;    /* WR_CHAIN_FULL / WR_CHAIN_LITE */
+} wr_profile_t;
 
 /* Parameters: 0..127, except WR_P_TUNE (-50..+50 cents). */
 enum {
@@ -49,6 +71,8 @@ typedef struct {
     int32_t gain_q16;   /* linear fade, 1.0 = 1 << 16 */
     int32_t step_q16;
     uint8_t note;
+    uint8_t modes;
+    uint8_t pickup;
     uint8_t active;
 } wr_fade_t;
 
@@ -81,6 +105,7 @@ typedef struct {
     /* Housekeeping. */
     uint8_t active, gate, sustained;
     uint8_t note, vel;
+    uint8_t modes, pickup, noise_on, drag_on;
     uint16_t renorm;
     uint32_t age;
     uint32_t rel_blocks;
@@ -91,6 +116,9 @@ typedef struct {
 
 typedef struct {
     wr_voice_t v[WR_MAX_VOICES];
+    wr_profile_t profile;
+    uint8_t voice_limit;
+    int32_t master_q24;    /* output gain, Q24; 1.0 = unchanged */
 
     int32_t knob[WR_P_COUNT];
     int32_t vol_gain;      /* Q24 */
@@ -119,6 +147,14 @@ typedef struct {
 void wr_init(wr_engine_t *e, int sample_rate);
 void wr_set_param(wr_engine_t *e, int id, int value);
 int wr_get_param(const wr_engine_t *e, int id);
+
+/* Runtime profile and voice limit. Both return 0 on invalid values. */
+int wr_set_profile(wr_engine_t *e, const wr_profile_t *p);
+wr_profile_t wr_get_profile(const wr_engine_t *e);
+int wr_set_voice_limit(wr_engine_t *e, int voices);
+int wr_get_voice_limit(const wr_engine_t *e);
+void wr_set_master_q24(wr_engine_t *e, int32_t gain_q24);
+int32_t wr_get_master_q24(const wr_engine_t *e);
 
 int wr_note_on(wr_engine_t *e, int note, int vel);
 void wr_note_off(wr_engine_t *e, int note);

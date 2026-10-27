@@ -163,7 +163,47 @@ int main(void)
     assert(peak_of(buf, SR) < 1.0);
     assert(wr_active_voices(&e) <= WR_MAX_VOICES);
 
+    /* 8b. Runtime voice limit and quality profile. */
+    {
+        wr_engine_t lab;
+        wr_init(&lab, SR);
+        clean_defaults(&lab);
+        wr_profile_t def = wr_get_profile(&lab);
+        assert(def.voices == WR_DEFAULT_VOICES);
+        assert(def.modes == WR_NMODES);
+        assert(def.pickup == WR_PICKUP_FULL);
+        assert(def.noise == 1 && def.drag == 1 && def.chain == WR_CHAIN_FULL);
+        assert(wr_get_voice_limit(&lab) == WR_DEFAULT_VOICES);
+
+        assert(wr_set_voice_limit(&lab, 4) == 1);
+        for (int k = 0; k < 8; k++)
+            wr_note_on(&lab, 48 + k, 100);
+        assert(wr_active_voices(&lab) == 4);
+        printf("voice limit 4: active %d\n", wr_active_voices(&lab));
+
+        wr_profile_t lite = {4, 3, WR_PICKUP_LITE, 0, 0, WR_CHAIN_LITE};
+        assert(wr_set_profile(&lab, &lite) == 1);
+        wr_profile_t got = wr_get_profile(&lab);
+        assert(got.modes == 3 && got.pickup == WR_PICKUP_LITE);
+        assert(wr_get_voice_limit(&lab) == 4);
+        wr_all_notes_off(&lab);
+        render(&lab, SR / 2);
+        assert(wr_note_on(&lab, 60, 100) == 1);
+        render(&lab, SR / 2);
+        assert(peak_of(buf, SR / 2) > 0.002);
+
+        wr_profile_t bad = {4, 0, WR_PICKUP_FULL, 1, 1, WR_CHAIN_FULL};
+        assert(wr_set_profile(&lab, &bad) == 0);
+
+        wr_set_master_q24(&lab, 1 << 23); /* 0.5 */
+        assert(wr_get_master_q24(&lab) == 1 << 23);
+        wr_set_master_q24(&lab, 0x7FFFFFFF); /* clamp */
+        assert(wr_get_master_q24(&lab) <= 2 * (1 << 24));
+    }
+
     /* 9. All notes off -> quiet. */
+    wr_init(&e, SR);
+    clean_defaults(&e);
     wr_all_notes_off(&e);
     render(&e, SR * 3 / 2);
     double tail = rms_of(buf, SR * 3 / 2 - 4410, SR * 3 / 2);

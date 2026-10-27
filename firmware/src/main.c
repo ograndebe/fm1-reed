@@ -17,11 +17,28 @@
  */
 #include <stdint.h>
 
+#ifndef REED_LAB
+#define REED_LAB 0
+#endif
+
+#if REED_LAB
+/* Lab image: USB-CDC control/log and USB audio capture (UAC, 44.1 kHz only)
+ * so the host script can record the same output the DAC gets. */
 #define FELUCCA_CDC 1
+#define FELUCCA_UAC 1
+#define FELUCCA_UAC_48K 0
+#define FELUCCA_UAC_DEEP 1
+#define FELUCCA_UAC_AS_FIRST 1
+#define FELUCCA_USB_PRODUCT "FM-1 Reed LAB"
+#else
+#define FELUCCA_CDC 0
 #define FELUCCA_UAC 0
 #define FELUCCA_USB_PRODUCT "FM-1 Reed"
+#endif
 #define FELUCCA_USB_MANUFACTURER "Reed"
 #define RING_PUBLISH() __asm__ volatile("" ::: "memory")
+#define HALF_FRAMES 128
+#define HALF_WORDS (HALF_FRAMES * 2u)
 
 #include "fm1_time.h"
 #include "fm1_sys.h"
@@ -37,8 +54,6 @@
 #include "wurli.h"
 #include "font5x7.h"
 
-#define HALF_FRAMES 128
-#define HALF_WORDS (HALF_FRAMES * 2u)
 #define Q20_ONE 1048576
 
 extern uint32_t _data_start[], _data_end[], _data_load[];
@@ -50,7 +65,7 @@ extern void isr_alnk0(void);
 static int32_t abuf[2u * HALF_WORDS] __attribute__((aligned(4)));
 static wr_engine_t eng;
 static volatile uint32_t ms;
-static volatile uint32_t audio_max_us, audio_last_us;
+static volatile uint32_t audio_max_us, audio_last_us, audio_late;
 static struct { uint32_t magic, pending, failed; } guard __attribute__((section(".noinit")));
 
 /* --------------------------------------------------------------- events --- */
@@ -124,6 +139,200 @@ static void ev_drain(void)
     }
 }
 
+/* ----------------------------------------------------------- lab console --- */
+#if REED_LAB
+static char lab_line[64];
+static uint32_t lab_len;
+
+static void lab_putc(char c)
+{
+    if ((uint32_t)(co_w - co_r) >= CO_N)
+        return;
+    cdc_out[co_w % CO_N] = (uint8_t)c;
+    RING_PUBLISH();
+    co_w++;
+}
+
+static void lab_puts(const char *s)
+{
+    while (*s)
+        lab_putc(*s++);
+}
+
+static void lab_u32(uint32_t v)
+{
+    char b[10];
+    int n = 0;
+    if (!v) {
+        lab_putc('0');
+        return;
+    }
+    while (v && n < 10) {
+        b[n++] = (char)('0' + v % 10u);
+        v /= 10u;
+    }
+    while (n)
+        lab_putc(b[--n]);
+}
+
+static int32_t lab_num(const char **pp)
+{
+    const char *p = *pp;
+    int neg = 0;
+    int32_t v = 0;
+    while (*p == ' ')
+        p++;
+    if (*p == '-') {
+        neg = 1;
+        p++;
+    }
+    while (*p >= '0' && *p <= '9') {
+        v = v * 10 + (*p - '0');
+        p++;
+    }
+    *pp = p;
+    return neg ? -v : v;
+}
+
+static void lab_stat(void)
+{
+    uint32_t cpu = audio_last_us * 100u / 2901u;
+    lab_puts("STAT active=");
+    lab_u32((uint32_t)wr_active_voices(&eng));
+    lab_puts(" limit=");
+    lab_u32((uint32_t)wr_get_voice_limit(&eng));
+    lab_puts(" last_us=");
+    lab_u32(audio_last_us);
+    lab_puts(" max_us=");
+    lab_u32(audio_max_us);
+    lab_puts(" late=");
+    lab_u32(audio_late);
+    lab_puts(" cpu=");
+    lab_u32(cpu);
+    lab_puts("\n");
+}
+
+static void lab_set_default(void)
+{
+    wr_profile_t p;
+    p.voices = WR_DEFAULT_VOICES;
+    p.modes = WR_NMODES;
+    p.pickup = WR_PICKUP_FULL;
+    p.noise = 1;
+    p.drag = 1;
+    p.chain = WR_CHAIN_FULL;
+    fm1_irq_off();
+    wr_all_notes_off(&eng);
+    wr_set_profile(&eng, &p);
+    wr_set_master_q24(&eng, wr_gain_db_tab[24]); /* 0 dB */
+    fm1_irq_on();
+}
+
+static void lab_profile(const char *q)
+{
+    int32_t voices = lab_num(&q);
+    int32_t modes = lab_num(&q);
+    int32_t pickup = lab_num(&q);
+    int32_t noise = lab_num(&q);
+    int32_t drag = lab_num(&q);
+    int32_t chain = lab_num(&q);
+    int32_t db = lab_num(&q);
+    if (voices < 1 || voices > WR_MAX_VOICES || modes < 1 || modes > WR_NMODES ||
+        pickup < 0 || pickup > 1 || noise < 0 || noise > 1 || drag < 0 || drag > 1 ||
+        chain < 0 || chain > 1) {
+        lab_puts("ERR profile\n");
+        return;
+    }
+    if (db < -24)
+        db = -24;
+    if (db > 6)
+        db = 6;
+    wr_profile_t p;
+    p.voices = (uint8_t)voices;
+    p.modes = (uint8_t)modes;
+    p.pickup = (uint8_t)pickup;
+    p.noise = (uint8_t)noise;
+    p.drag = (uint8_t)drag;
+    p.chain = (uint8_t)chain;
+    fm1_irq_off();
+    wr_all_notes_off(&eng);
+    int ok = wr_set_profile(&eng, &p);
+    if (ok)
+        wr_set_master_q24(&eng, wr_gain_db_tab[db + 24]);
+    fm1_irq_on();
+    if (!ok) {
+        lab_puts("ERR profile\n");
+        return;
+    }
+    lab_puts("OK ");
+    lab_u32((uint32_t)wr_get_voice_limit(&eng));
+    lab_putc(' ');
+    lab_u32((uint32_t)wr_get_profile(&eng).modes);
+    lab_putc(' ');
+    lab_u32((uint32_t)wr_get_master_q24(&eng));
+    lab_putc('\n');
+}
+
+static void lab_command(void)
+{
+    lab_line[lab_len] = 0;
+    if (lab_len && lab_line[lab_len - 1] == '\r')
+        lab_line[--lab_len] = 0;
+    if (!lab_len)
+        return;
+    switch (lab_line[0]) {
+    case 'P':
+    case 'p':
+        lab_profile(lab_line + 1);
+        break;
+    case 'S':
+    case 's':
+        lab_stat();
+        break;
+    case 'C':
+    case 'c':
+        audio_max_us = 0;
+        audio_last_us = 0;
+        audio_late = 0;
+        lab_puts("OK stats\n");
+        break;
+    case 'X':
+    case 'x':
+        fm1_irq_off();
+        wr_panic(&eng);
+        fm1_irq_on();
+        lab_puts("OK panic\n");
+        break;
+    case 'R':
+    case 'r':
+        lab_set_default();
+        lab_puts("OK default\n");
+        break;
+    case 'V':
+    case 'v':
+        lab_puts("REED-LAB 0.2\n");
+        break;
+    default:
+        lab_puts("ERR command\n");
+        break;
+    }
+    lab_len = 0;
+}
+
+static void lab_poll(void)
+{
+    while (ci_r != ci_w) {
+        char c = (char)cdc_in[ci_r % CI_N];
+        ci_r++;
+        if (c == '\n') {
+            lab_command();
+        } else if (lab_len < sizeof(lab_line) - 1) {
+            lab_line[lab_len++] = c;
+        }
+    }
+}
+#endif
+
 /* ---------------------------------------------------------------- audio --- */
 void fm1_alnk0_irq(void)
 {
@@ -134,6 +343,9 @@ void fm1_alnk0_irq(void)
         uint32_t half = fm1_audio_free_half();
         int32_t *o = &abuf[half * HALF_WORDS];
         int32_t mono[HALF_FRAMES];
+#if REED_LAB
+        uac_render_start();
+#endif
         ev_drain();
         wr_render(&eng, mono, HALF_FRAMES);
         for (uint32_t i = 0; i < HALF_FRAMES; i++) {
@@ -146,7 +358,12 @@ void fm1_alnk0_irq(void)
             o[2u * i] = s;
             o[2u * i + 1u] = s;
         }
+#if REED_LAB
+        uac_tap(o, HALF_FRAMES);
+#endif
         fm1_audio_ack_half();
+        if (REED_LAB && fm1_audio_free_half() != half)
+            audio_late++;
         uint32_t us = (fm1_ticks() - t0) / FM1_TICKS_PER_US;
         audio_last_us = us;
         if (us > audio_max_us)
@@ -455,10 +672,17 @@ static void app_main(void)
     draw_status(-1, 0, 0);
 
     usb_start();
+#if REED_LAB
+    lab_puts("REED-LAB 0.2 ready\n");
+    lab_puts("commands: P voices modes pickup noise drag chain db | S | R | X | V\n");
+#endif
     fm1_timer5_start(isr_timer5, 4); /* above ALNK0, as Felucca */
     fm1_irq_enable_all();
 
     for (;;) {
+#if REED_LAB
+        lab_poll();
+#endif
         fm1_input_scan();
         uint32_t now = ms;
 

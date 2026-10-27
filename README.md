@@ -18,6 +18,8 @@ same source builds for the host, for WebAssembly and for the FM-1's JieLi AC79
 
 **Live:** [ograndebe.github.io/fm1-reed](https://ograndebe.github.io/fm1-reed/) ·
 [Emulator](https://ograndebe.github.io/fm1-reed/try/) ·
+[Lab (WIP)](https://ograndebe.github.io/fm1-reed/lab.html) ·
+[Profiles (WIP)](https://ograndebe.github.io/fm1-reed/profiles.html) ·
 [Documentation](https://ograndebe.github.io/fm1-reed/docs.html) ·
 [Source](https://github.com/ograndebe/fm1-reed) ·
 [Português](README.pt-BR.md) · [Plan](docs/PLAN.md)
@@ -59,6 +61,7 @@ make reed          # build the offline renderer
 ./build/reed demo --out demo.wav
 ./build/reed note --note 60 --vel 100 --seconds 3 --out c4.wav
 ./build/reed midi --in song.mid --out song.wav
+./build/reed note --profile lq32 --note 60 --out lq32.wav
 ./build/reed bench
 ```
 
@@ -85,7 +88,7 @@ modal reed (7 modes) → hammer dwell/onset → electrostatic pickup
   the drawn volume-pot network, 33 Hz feedback shelf, closed-loop power amp with
   crossover distortion, and the 4×8″ speaker.
 - **Fixed point**: Q30 reed/pickup, Q24 gain staging, Q28 biquads, Q32 phase,
-  32×32→64 MACs. Eight voices (compile-time budget), 5 ms steal crossfade.
+  32×32→64 MACs. Eight active voices by default (32-slot capacity), 5 ms steal crossfade.
 
 ### Fidelity
 
@@ -110,6 +113,8 @@ git submodule update --init --recursive
 The alpha image is `firmware/build/reed.bin` (about 84 KB): ALNK0 I2S audio, the
 engine in the DMA interrupt, 27 keys + 14 buttons, 7 encoders, the 240×240 LCD,
 USB-MIDI input and a boot guard that falls back to UBOOT after two failed boots.
+`REED_LAB=1 ./firmware/build.sh` builds `reed-lab.bin` with a USB-CDC profile
+console and USB audio capture for measurements; see [docs/LAB.md](docs/LAB.md).
 It has **no OTA/installer entry and has not been validated on a physical FM-1**.
 Do not flash it as a first test. Read [firmware/README.md](firmware/README.md) and
 [BUILDING.md](BUILDING.md) first.
@@ -121,6 +126,7 @@ Do not flash it as a first test. Read [firmware/README.md](firmware/README.md) a
 | `engine/` | Portable fixed-point engine, public API and host tests |
 | `tools/tablegen/` | Rust generator for the OpenWurli-derived tables |
 | `tools/render/` | Offline WAV / MIDI renderer and benchmark |
+| `tools/lab/` | WIP profile capture runner and candidate profiles |
 | `web/` | GitHub Pages site and the WebAssembly emulator |
 | `firmware/` | FM-1 alpha application on felucca-bsp |
 | `bsp/felucca-bsp` | Hardware layer (git submodule, MPL-2.0) |
@@ -133,6 +139,7 @@ Do not flash it as a first test. Read [firmware/README.md](firmware/README.md) a
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — engine structure, data flow, Q formats
 - [docs/PORTING.md](docs/PORTING.md) — what is exact, what is behavioural, calibration
 - [docs/POLYPHONY.md](docs/POLYPHONY.md) — advanced polyphony/quality profiles and hardware risks
+- [docs/LAB.md](docs/LAB.md) — lab image, serial protocol, capture and safety
 - [docs/HARDWARE.md](docs/HARDWARE.md) — FM-1 facts, audio/timer/interrupt layout
 - [BUILDING.md](BUILDING.md) — host, emulator and firmware builds, recovery
 - [firmware/README.md](firmware/README.md) — wiring, UI, current alpha limits

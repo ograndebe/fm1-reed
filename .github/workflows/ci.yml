@@ -30,6 +30,13 @@ jobs:
         run: |
           ./build/reed note --note 60 --vel 100 --seconds 1 --out /tmp/reed.wav
           python3 tests/check_wav.py /tmp/reed.wav 44100
+          ./build/reed note --profile lq32 --note 60 --vel 100 --seconds 1 --out /tmp/reed-lq.wav
+          python3 tests/check_wav.py /tmp/reed-lq.wav 44100
+      - name: Check the lab runner and profiles
+        if: runner.os == 'Linux'
+        run: |
+          python3 -m py_compile tools/lab/run_profiles.py
+          python3 tools/lab/run_profiles.py --dry-run --profiles tools/lab/profiles.json --only HQ_8 --out /tmp/reed-lab-dry --force
 
   sanitizers:
     name: ASan + UBSan

@@ -1,6 +1,7 @@
 # Polyphony and quality profiles
 
-Status: **analysis / design**, not implemented. This document answers how to let
+Status: **analysis**, with the lab engine/build implemented in `docs/LAB.md`
+(`REED_LAB=1`). The release profiles are not chosen yet. This document answers how to let
 the FM-1 run more notes by spending less per voice, how to expose that on the
 hardware, and what can go wrong.
 
@@ -24,9 +25,8 @@ The lab build must be clearly identified (USB product string and version, e.g.
 
 ## 1. What exists today
 
-- The engine has a compile-time array of `WR_MAX_VOICES` voices
-  (`engine/include/wurli.h`). The default is 8; the CI also builds a 32-slot
-  capacity variant.
+- The engine has a compile-time array of `WR_MAX_VOICES` slots (32,
+  `engine/include/wurli.h`). The runtime `voice_limit` defaults to 8.
 - `wr_init()` zeroes the whole engine. No voice is active until `wr_note_on()`.
 - `wr_render()` walks the slots and calls `voice_block()` only for `v->active`.
   Inactive slots do no DSP. There is **no hidden 64-voice engine** and no

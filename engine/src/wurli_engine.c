@@ -114,30 +114,38 @@ static uint32_t isqrt32(uint32_t n)
 }
 
 /* ---------------------------------------------------------------- pickup --- */
-/* One sample of the electrostatic pickup: displacement Q30 -> volts Q30. */
-static inline int32_t pickup_step(int32_t beam, const wr_note_t *nt,
+/* One sample of the electrostatic pickup: displacement Q30 -> volts Q30.
+ * lite = linear law + the same node recursion (no overlap-law harmonics). */
+static inline int32_t pickup_step(int32_t beam, const wr_note_t *nt, int lite,
                                   int32_t *w, int32_t *s_prev, int32_t *m_prev)
 {
-    const wr_pickup_law_t *law = &wr_laws[nt->law];
     int32_t u = (int32_t)(((int64_t)nt->band * nt->swing_q16 * beam) >> 30) -
                 wr_consts.rest_q16;
+    int32_t s;
 
-    int64_t pos64 = ((int64_t)(u - law->u0_q16) * law->inv_du_q16) >> 16;
-    int32_t last = (law->n - 1) << 16;
-    int32_t pos = pos64 < 0 ? 0 : pos64 > last ? last : (int32_t)pos64;
-    uint32_t i = (uint32_t)pos >> 16;
-    uint32_t f = (uint32_t)pos & 0xFFFFu;
-    uint32_t a = 65536u - f;
+    if (lite) {
+        int32_t d = u + wr_consts.rest_q16; /* displacement, mm Q16 */
+        s = (int32_t)(((int64_t)nt->slope_q30 * d) >> 16);
+        s = clamp32(s, -(1 << 29), 1 << 29);
+    } else {
+        const wr_pickup_law_t *law = &wr_laws[nt->law];
+        int64_t pos64 = ((int64_t)(u - law->u0_q16) * law->inv_du_q16) >> 16;
+        int32_t last = (law->n - 1) << 16;
+        int32_t pos = pos64 < 0 ? 0 : pos64 > last ? last : (int32_t)pos64;
+        uint32_t i = (uint32_t)pos >> 16;
+        uint32_t f = (uint32_t)pos & 0xFFFFu;
+        uint32_t a = 65536u - f;
 
-    int32_t lin = (int32_t)(((int64_t)(int32_t)a * law->y[i] +
-                             (int64_t)(int32_t)f * law->y[i + 1]) >> 16);
-    int32_t a3 = (int32_t)(((((int64_t)(int32_t)a * (int32_t)a) >> 16) *
-                            (int32_t)a) >> 16) - (int32_t)a;
-    int32_t f3 = (int32_t)(((((int64_t)(int32_t)f * (int32_t)f) >> 16) *
-                            (int32_t)f) >> 16) - (int32_t)f;
-    int32_t cub = (int32_t)(((int64_t)a3 * law->mh[i] +
-                             (int64_t)f3 * law->mh[i + 1]) >> 16);
-    int32_t s = lin + cub - nt->c_rest;
+        int32_t lin = (int32_t)(((int64_t)(int32_t)a * law->y[i] +
+                                 (int64_t)(int32_t)f * law->y[i + 1]) >> 16);
+        int32_t a3 = (int32_t)(((((int64_t)(int32_t)a * (int32_t)a) >> 16) *
+                                (int32_t)a) >> 16) - (int32_t)a;
+        int32_t f3 = (int32_t)(((((int64_t)(int32_t)f * (int32_t)f) >> 16) *
+                                (int32_t)f) >> 16) - (int32_t)f;
+        int32_t cub = (int32_t)(((int64_t)a3 * law->mh[i] +
+                                 (int64_t)f3 * law->mh[i + 1]) >> 16);
+        s = lin + cub - nt->c_rest;
+    }
 
     int32_t m = Q30_ONE + mul30(s, wr_consts.reed_ratio);
     int32_t m_avg = (int32_t)(((int64_t)*m_prev + m) >> 1);
@@ -159,7 +167,7 @@ static inline int32_t pickup_step(int32_t beam, const wr_note_t *nt,
 /* ---------------------------------------------------------------- voices --- */
 static void voice_renorm(wr_voice_t *v)
 {
-    for (int m = 0; m < WR_NMODES; m++) {
+    for (int m = 0; m < v->modes; m++) {
         int32_t s = v->s[m], c = v->c[m];
         uint32_t r2 = (uint32_t)(mul30(s, s) + mul30(c, c));
         uint32_t r = isqrt32(r2);
@@ -184,6 +192,10 @@ static void voice_start(wr_engine_t *e, wr_voice_t *v, int note, int vel)
     v->sustained = 0;
     v->note = (uint8_t)note;
     v->vel = (uint8_t)vel;
+    v->modes = (uint8_t)clamp32(e->profile.modes, 1, WR_NMODES);
+    v->pickup = e->profile.pickup;
+    v->noise_on = e->profile.noise;
+    v->drag_on = e->profile.drag;
     v->age = ++e->age;
     v->rel_blocks = 0;
     v->damping = 0;
@@ -195,7 +207,7 @@ static void voice_start(wr_engine_t *e, wr_voice_t *v, int note, int vel)
     v->s_prev = 0;
     v->m_prev = Q30_ONE;
     v->n_s1 = v->n_s2 = 0;
-    v->n_remain = 661; /* 15 ms */
+    v->n_remain = v->noise_on ? 661 : 0; /* 15 ms */
     v->n_fade = 16;
     v->nstate = 0x9e3779b9u ^ ((uint32_t)note * 2654435761u) ^ e->age;
     v->fade.active = 0;
@@ -218,24 +230,30 @@ static void voice_start(wr_engine_t *e, wr_voice_t *v, int note, int vel)
     int32_t cycles = ((254 - vel) << 16) / 127; /* Q16, 1.0 (ff) .. 2.0 (pp) */
     int32_t z0 = (int32_t)((((int64_t)cycles * cycles) >> 16) >> 7);
     for (int m = 0; m < WR_NMODES; m++) {
-        int32_t ft = (int32_t)(((int64_t)nt->ratio[m] * cycles) >> 16);
-        int32_t z = (int32_t)((((int64_t)ft * ft) >> 16) >> 7);
-        int32_t dwell = (m == 0) ? Q30_ONE : expneg_q30(z - z0);
-        int32_t amp = mul30(nt->amp[m], dwell);
-        v->amp[m] = mul30(amp, drive);
+        if (m < v->modes) {
+            int32_t ft = (int32_t)(((int64_t)nt->ratio[m] * cycles) >> 16);
+            int32_t z = (int32_t)((((int64_t)ft * ft) >> 16) >> 7);
+            int32_t dwell = (m == 0) ? Q30_ONE : expneg_q30(z - z0);
+            int32_t amp = mul30(nt->amp[m], dwell);
+            v->amp[m] = mul30(amp, drive);
+
+            uint32_t inc = nt->inc[m];
+            if (tune != 0) {
+                inc = (uint32_t)(((uint64_t)inc * (uint32_t)tune_gain) >> 30);
+                v->rcos[m] = cos_q30(inc);
+                v->rsin[m] = sin_q30(inc);
+            } else {
+                v->rcos[m] = nt->cos[m];
+                v->rsin[m] = nt->sin[m];
+            }
+        } else {
+            v->amp[m] = 0;
+            v->rcos[m] = Q30_ONE;
+            v->rsin[m] = 0;
+        }
         v->s[m] = 0;
         v->c[m] = Q30_ONE;
         v->env[m] = Q30_ONE;
-
-        uint32_t inc = nt->inc[m];
-        if (tune != 0) {
-            inc = (uint32_t)(((uint64_t)inc * (uint32_t)tune_gain) >> 30);
-            v->rcos[m] = cos_q30(inc);
-            v->rsin[m] = sin_q30(inc);
-        } else {
-            v->rcos[m] = nt->cos[m];
-            v->rsin[m] = nt->sin[m];
-        }
     }
 
     /* Onset: 1 period at ff, 2 at pp; 2 ms floor. */
@@ -258,7 +276,7 @@ static void voice_block(wr_voice_t *v, int32_t *mix, uint32_t n)
     const wr_note_t *nt = &wr_notes[v->note - WR_MIDI_LO];
 
     /* Block-rate envelopes. */
-    for (int m = 0; m < WR_NMODES; m++) {
+    for (int m = 0; m < v->modes; m++) {
         int32_t env = v->env[m];
         if (v->damping) {
             int32_t g = Q30_ONE + mul30(nt->damper[m] - Q30_ONE, v->damp_progress);
@@ -277,7 +295,7 @@ static void voice_block(wr_voice_t *v, int32_t *mix, uint32_t n)
             v->damp_blocks--;
         }
     }
-    if (nt->drag_q30) {
+    if (nt->drag_q30 && v->drag_on) {
         int32_t d = mul30(nt->drag_q30, v->amp[0]);
         int32_t c = mul30(d, v->env[0]);
         v->env[0] = mul30(v->env[0], Q30_ONE - c);
@@ -298,7 +316,7 @@ static void voice_block(wr_voice_t *v, int32_t *mix, uint32_t n)
         }
 
         int64_t beam = 0;
-        for (int m = 0; m < WR_NMODES; m++) {
+        for (int m = 0; m < v->modes; m++) {
             beam += mul30(v->amp_env[m], v->s[m]);
             int32_t s = v->s[m], c = v->c[m];
             v->s[m] = mul30(s, v->rcos[m]) + mul30(c, v->rsin[m]);
@@ -311,7 +329,7 @@ static void voice_block(wr_voice_t *v, int32_t *mix, uint32_t n)
         beam = (beam * on) >> 30;
 
         /* Hammer attack noise, added to the reed displacement. */
-        if (v->n_remain) {
+        if (v->noise_on && v->n_remain) {
             uint32_t st = v->nstate * 1664525u + 1013904223u;
             v->nstate = st;
             int32_t x = (int32_t)st >> 1; /* Q30 */
@@ -331,7 +349,8 @@ static void voice_block(wr_voice_t *v, int32_t *mix, uint32_t n)
             v->n_remain--;
         }
 
-        int32_t out = pickup_step((int32_t)beam, nt, &v->w, &v->s_prev, &v->m_prev);
+        int32_t out = pickup_step((int32_t)beam, nt, v->pickup == WR_PICKUP_LITE,
+                                  &v->w, &v->s_prev, &v->m_prev);
         out = mul24(out, v->gain_q24) >> 10; /* Q30 -> Q20 */
         mix[i] += out;
     }
@@ -344,7 +363,7 @@ static void voice_block(wr_voice_t *v, int32_t *mix, uint32_t n)
     if (!v->gate) {
         v->rel_blocks++;
         int silent = 1;
-        for (int m = 0; m < WR_NMODES; m++)
+        for (int m = 0; m < v->modes; m++)
             if (v->env[m] >= (1 << 14))
                 silent = 0;
         if ((v->damping && silent) || v->rel_blocks > 13781u)
@@ -356,6 +375,8 @@ static void voice_block(wr_voice_t *v, int32_t *mix, uint32_t n)
 static void fade_take(wr_fade_t *f, const wr_voice_t *v)
 {
     f->note = v->note;
+    f->modes = v->modes;
+    f->pickup = v->pickup;
     f->gain_q24 = v->gain_q24;
     f->gain_q16 = 1 << 16;
     f->step_q16 = (1 << 16) / FADE_LEN;
@@ -379,13 +400,13 @@ static void fade_block(wr_fade_t *f, int32_t *mix, uint32_t n)
     if (!f->active)
         return;
     const wr_note_t *nt = &wr_notes[f->note - WR_MIDI_LO];
-    for (int m = 0; m < WR_NMODES; m++) {
+    for (int m = 0; m < f->modes; m++) {
         f->env[m] = mul30(f->env[m], nt->decay[m]);
         f->amp_env[m] = mul30(f->amp[m], f->env[m]);
     }
     for (uint32_t i = 0; i < n; i++) {
         int64_t beam = 0;
-        for (int m = 0; m < WR_NMODES; m++) {
+        for (int m = 0; m < f->modes; m++) {
             beam += mul30(f->amp_env[m], f->s[m]);
             int32_t s = f->s[m], c = f->c[m];
             f->s[m] = mul30(s, f->rcos[m]) + mul30(c, f->rsin[m]);
@@ -395,7 +416,8 @@ static void fade_block(wr_fade_t *f, int32_t *mix, uint32_t n)
             beam = 2LL << 30;
         else if (beam < -(2LL << 30))
             beam = -(2LL << 30);
-        int32_t out = pickup_step((int32_t)beam, nt, &f->w, &f->s_prev, &f->m_prev);
+        int32_t out = pickup_step((int32_t)beam, nt, f->pickup == WR_PICKUP_LITE,
+                                  &f->w, &f->s_prev, &f->m_prev);
         out = mul24(out, f->gain_q24) >> 10;
         out = (int32_t)(((int64_t)out * f->gain_q16) >> 16);
         mix[i] += out;
@@ -405,6 +427,61 @@ static void fade_block(wr_fade_t *f, int32_t *mix, uint32_t n)
     }
     if (f->gain_q16 == 0)
         f->active = 0;
+}
+
+/* ------------------------------------------------------- runtime profile --- */
+int wr_set_voice_limit(wr_engine_t *e, int voices)
+{
+    if (voices < 1 || voices > WR_MAX_VOICES)
+        return 0;
+    if (voices < e->voice_limit) {
+        /* Do not cut sounding voices abruptly: let the slots above the new
+         * ceiling finish in the 5 ms steal fade. */
+        for (int i = voices; i < WR_MAX_VOICES; i++) {
+            wr_voice_t *v = &e->v[i];
+            if (v->active) {
+                fade_take(&v->fade, v);
+                v->active = 0;
+            }
+        }
+    }
+    e->voice_limit = (uint8_t)voices;
+    e->profile.voices = (uint8_t)voices;
+    return 1;
+}
+
+int wr_set_profile(wr_engine_t *e, const wr_profile_t *p)
+{
+    if (!p || p->voices < 1 || p->voices > WR_MAX_VOICES || p->modes < 1 ||
+        p->modes > WR_NMODES || p->pickup > WR_PICKUP_LITE ||
+        p->noise > 1 || p->drag > 1 || p->chain > WR_CHAIN_LITE)
+        return 0;
+    e->profile = *p;
+    return wr_set_voice_limit(e, p->voices);
+}
+
+wr_profile_t wr_get_profile(const wr_engine_t *e)
+{
+    return e->profile;
+}
+
+int wr_get_voice_limit(const wr_engine_t *e)
+{
+    return e->voice_limit;
+}
+
+void wr_set_master_q24(wr_engine_t *e, int32_t gain_q24)
+{
+    if (gain_q24 < 0)
+        gain_q24 = 0;
+    if (gain_q24 > 2 * Q24_ONE)
+        gain_q24 = 2 * Q24_ONE;
+    e->master_q24 = gain_q24;
+}
+
+int32_t wr_get_master_q24(const wr_engine_t *e)
+{
+    return e->master_q24;
 }
 
 /* ------------------------------------------------------------------- FX --- */
@@ -478,7 +555,7 @@ static inline int32_t chain_sample(wr_engine_t *e, int32_t xq20)
 
     /* Speaker character: polynomial + cone limit + 30 Hz / 5.5 kHz. */
     int32_t c = e->spk_char;
-    if (c > 0) {
+    if (e->profile.chain == WR_CHAIN_FULL && c > 0) {
         int32_t x2 = mul24(a, a);
         int32_t x3 = mul24(x2, a);
         int32_t a2 = mul30(c, A2_Q24);
@@ -499,6 +576,7 @@ static inline int32_t chain_sample(wr_engine_t *e, int32_t xq20)
      * residual DC, and the preamp bias is asymmetric by design. */
     e->dc_lp += mul30(DC_BLOCK_Q30, a - e->dc_lp);
     a -= e->dc_lp;
+    a = mul24(a, e->master_q24);
 
     return clamp32(mul24(a, OUTPUT_TRIM_Q24), -(1 << 24), 1 << 24);
 }
@@ -510,6 +588,14 @@ void wr_init(wr_engine_t *e, int sample_rate)
     uint8_t *p = (uint8_t *)e;
     for (uint32_t i = 0; i < sizeof(*e); i++)
         p[i] = 0;
+    e->profile.voices = WR_DEFAULT_VOICES;
+    e->profile.modes = WR_NMODES;
+    e->profile.pickup = WR_PICKUP_FULL;
+    e->profile.noise = 1;
+    e->profile.drag = 1;
+    e->profile.chain = WR_CHAIN_FULL;
+    e->voice_limit = WR_DEFAULT_VOICES;
+    e->master_q24 = Q24_ONE;
     e->knob[WR_P_VOLUME] = 102;   /* 0.8 */
     e->knob[WR_P_TREMOLO] = 64;   /* 0.5 */
     e->knob[WR_P_DRIVE] = 64;     /* 1.0 */
@@ -555,7 +641,8 @@ int wr_note_on(wr_engine_t *e, int note, int vel)
 
     wr_voice_t *slot = 0;
     wr_voice_t *reuse = 0;
-    for (int i = 0; i < WR_MAX_VOICES; i++) {
+    int limit = clamp32(e->voice_limit, 1, WR_MAX_VOICES);
+    for (int i = 0; i < limit; i++) {
         if (e->v[i].active && e->v[i].note == note && e->v[i].gate) {
             reuse = &e->v[i];
             break;
@@ -567,7 +654,7 @@ int wr_note_on(wr_engine_t *e, int note, int vel)
     if (!slot) {
         /* Prefer a released voice; else the quietest / oldest held one. */
         int32_t best = 0x7FFFFFFF;
-        for (int i = 0; i < WR_MAX_VOICES; i++) {
+        for (int i = 0; i < limit; i++) {
             wr_voice_t *c = &e->v[i];
             if (!c->active)
                 continue;

@@ -1,5 +1,6 @@
 build/
 firmware/build/
+firmware/build-lab/
 tools/tablegen/target/
 node_modules/
 __pycache__/

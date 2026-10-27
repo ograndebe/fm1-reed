@@ -184,3 +184,18 @@ canvas#scope { display: block; width: 220px; height: 64px; }
   .keyboard { height: 150px; }
   .try-head .links { display: none; }
 }
+
+/* lab / profiles */
+.pill { display: inline-block; padding: .18rem .5rem; border-radius: 999px; font-family: var(--mono); font-size: .62rem; letter-spacing: .08em; text-transform: uppercase; border: 1px solid var(--line); color: var(--cream-dim); }
+.pill.wip { color: #1a1308; background: var(--amber); border-color: var(--amber); }
+.pill.ok { color: #10200e; background: var(--green); border-color: var(--green); }
+.pill.todo { color: var(--cream-dim); }
+.lab-note { border-left: 2px solid var(--amber-soft); padding: .4rem 0 .4rem 1rem; color: var(--cream-dim); font-size: .92rem; }
+.lab-note strong { color: var(--cream); }
+.steps { counter-reset: step; display: grid; gap: .7rem; }
+.step { display: grid; grid-template-columns: 2rem 1fr; gap: .8rem; border: 1px solid var(--line); border-radius: 10px; padding: .9rem 1rem; background: var(--panel); }
+.step::before { counter-increment: step; content: counter(step); font-family: var(--mono); color: var(--amber); }
+.step h3 { margin: 0 0 .2rem; }
+.step p { margin: 0; font-size: .9rem; }
+.result-table td:last-child, .result-table th:last-child { text-align: right; }
+.muted { color: #8d7d68; }

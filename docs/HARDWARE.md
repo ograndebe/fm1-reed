@@ -34,7 +34,7 @@ measurements, not re-derived here. Reed consumes that layer.
   acknowledges. One half is 2.9 ms; that is the render deadline.
 - Felucca shifts Q15 to 24-bit with `OUT_SHIFT=7` (−6 dBFS ceiling). Reed maps its
   Q20 output with `<<3`, i.e. 1.0 Q20 = 2^23, full 24-bit scale. The engine's
-  output alignment (+4 dB) leaves headroom for eight voices.
+  output alignment (+4 dB) leaves headroom for the default eight-voice profile; the lab build can raise the limit to 32.
 
 ## Interrupts and timers
 

@@ -20,6 +20,7 @@
 #define WR_VOL_N 128
 #define WR_SIN_N 1024
 #define WR_SPK_N 33
+#define WR_GAIN_DB_N 31
 
 typedef struct {
     int32_t u0_q16;          /* first knot, mm, Q16 */
@@ -42,6 +43,7 @@ typedef struct {
     int32_t swing_q16;           /* ff swing at the pickup, mm, Q16 */
     int32_t drag_q30;            /* air-drag per block per unit envelope, Q30 */
     int32_t c_rest;              /* pickup law at rest, Q30 */
+    int32_t slope_q30;           /* dC/du at rest, per mm, Q30 (lite pickup) */
     uint32_t damper_ramp;        /* damper ramp, samples */
     int8_t law;                  /* index into wr_laws */
     int8_t band;                 /* +1 pickup above reed, -1 below */
@@ -75,6 +77,7 @@ extern const int32_t wr_onset_tab[WR_ONSET_N + 1];
 extern const int32_t wr_tune_tab[WR_TUNE_N];
 extern const int32_t wr_sin_tab[WR_SIN_N + 1];
 extern const int32_t wr_spk_inv_tab[WR_SPK_N];
+extern const int32_t wr_gain_db_tab[WR_GAIN_DB_N];
 extern const int32_t wr_vol_gain_tab[WR_VOL_N];
 
 #endif

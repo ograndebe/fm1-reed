@@ -354,6 +354,59 @@ static void setup(wr_engine_t *e, int argc, char **argv)
     wr_set_param(e, WR_P_SPEAKER, intval(argc, argv, "--speaker", 90));
     wr_set_param(e, WR_P_DRIVE, intval(argc, argv, "--drive", 64));
     wr_set_param(e, WR_P_TUNE, intval(argc, argv, "--tune", 0));
+
+    wr_profile_t p = wr_get_profile(e);
+    const char *name = argval(argc, argv, "--profile");
+    if (name) {
+        if (!strcmp(name, "hq8")) {
+            p.voices = 8; p.modes = 7; p.pickup = WR_PICKUP_FULL;
+            p.noise = 1; p.drag = 1; p.chain = WR_CHAIN_FULL;
+        } else if (!strcmp(name, "mq16")) {
+            p.voices = 16; p.modes = 5; p.pickup = WR_PICKUP_FULL;
+            p.noise = 1; p.drag = 1; p.chain = WR_CHAIN_FULL;
+        } else if (!strcmp(name, "lq32")) {
+            p.voices = 32; p.modes = 3; p.pickup = WR_PICKUP_LITE;
+            p.noise = 0; p.drag = 0; p.chain = WR_CHAIN_LITE;
+        } else if (!strcmp(name, "full32")) {
+            p.voices = 32; p.modes = 7; p.pickup = WR_PICKUP_FULL;
+            p.noise = 1; p.drag = 1; p.chain = WR_CHAIN_FULL;
+        } else {
+            fprintf(stderr, "unknown --profile %s (hq8, mq16, lq32, full32)\n", name);
+            exit(1);
+        }
+    }
+    p.voices = (uint8_t)intval(argc, argv, "--voices", p.voices);
+    p.modes = (uint8_t)intval(argc, argv, "--modes", p.modes);
+    const char *pick = argval(argc, argv, "--pickup");
+    if (pick) {
+        if (!strcmp(pick, "lite"))
+            p.pickup = WR_PICKUP_LITE;
+        else if (!strcmp(pick, "full"))
+            p.pickup = WR_PICKUP_FULL;
+        else {
+            fprintf(stderr, "--pickup must be full or lite\n");
+            exit(1);
+        }
+    }
+    p.noise = (uint8_t)intval(argc, argv, "--noise", p.noise);
+    p.drag = (uint8_t)intval(argc, argv, "--drag", p.drag);
+    const char *chain = argval(argc, argv, "--chain");
+    if (chain) {
+        if (!strcmp(chain, "lite"))
+            p.chain = WR_CHAIN_LITE;
+        else if (!strcmp(chain, "full"))
+            p.chain = WR_CHAIN_FULL;
+        else {
+            fprintf(stderr, "--chain must be full or lite\n");
+            exit(1);
+        }
+    }
+    if (!wr_set_profile(e, &p)) {
+        fprintf(stderr, "invalid profile (voices 1..%d, modes 1..7)\n", WR_MAX_VOICES);
+        exit(1);
+    }
+    double master_db = dbval(argc, argv, "--master", 0.0);
+    wr_set_master_q24(e, (int32_t)(pow(10.0, master_db / 20.0) * 16777216.0));
 }
 
 /* ------------------------------------------------------------------ demo --- */
@@ -405,6 +458,9 @@ int main(int argc, char **argv)
         puts("reed note  --note 60 --vel 100 --seconds 3 --out note.wav");
         puts("reed midi  --in song.mid --out song.wav [--volume 0..127] [--tremolo 0..127]");
         puts("           [--speaker 0..127] [--drive 0..127] [--tune -50..50] [--gain dB]");
+        puts("           [--profile hq8|mq16|lq32|full32] [--voices 1..32] [--modes 1..7]");
+        puts("           [--pickup full|lite] [--noise 0|1] [--drag 0|1]");
+        puts("           [--chain full|lite] [--master dB]");
         puts("reed demo  --out demo.wav");
         puts("reed bench");
         return 0;

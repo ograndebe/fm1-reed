@@ -31,6 +31,8 @@
     <nav>
       <a href="index.html">Home</a>
       <a href="try/index.html">Emulator</a>
+      <a href="lab.html">Lab build</a>
+      <a href="profiles.html">Profile selection (WIP)</a>
       <a href="#build">Build</a>
       <a href="#licence">Licence</a>
       <a href="https://github.com/ograndebe/fm1-reed" target="_blank" rel="noopener">Source ↗</a>
@@ -60,7 +62,7 @@
       27-key MIDI keyboard built around the JieLi AC79 (pi32v2, 360 MHz, no FPU). The project
       has three pieces:</p>
       <ul>
-        <li><strong>Engine</strong> — portable C99, fixed point only, 44.1 kHz, 8 voices, mono.
+        <li><strong>Engine</strong> — portable C99, fixed point only, 44.1 kHz, 8 active voices by default (32-slot capacity), mono.
         It is the same source on the host, in WebAssembly and on the device.</li>
         <li><strong>Firmware</strong> — the FM-1 application: key scan, encoders, LCD, USB MIDI,
         audio DMA and settings, built on <code>felucca-bsp</code> (the hardware layer extracted
@@ -109,7 +111,7 @@
       removes the quantised filter's residual offset.</p>
 
       <h3>Voices and stealing</h3>
-      <p>Eight voices by default (<code>WR_MAX_VOICES</code>, compile-time). A new note takes a free slot; when all are busy, the
+      <p>Eight active voices by default (<code>voice_limit</code>; 32-slot capacity). A new note takes a free slot; when all are busy, the
       quietest released/oldest voice is copied into a 5 ms crossfade and the slot restarts.
       Top-five reeds have no damper, as on the real instrument. Sustain (CC64) is supported.</p>
 
@@ -238,6 +240,15 @@ python3 -m http.server -d web 8080
         <tr><td>v1.0</td><td>Calibration listening pass, factory presets, recovery docs, release
         artifacts.</td></tr>
       </table>
+
+      <h2 id="lab">Lab build and profile selection</h2>
+      <p><code>REED_LAB=1 ./firmware/build.sh</code> builds a measurement image with a
+      USB-CDC console (runtime voices/modes/pickup/noise/drag/chain/master) and USB audio
+      capture at 44.1 kHz. It is not a release. The serial protocol, safety notes and capture
+      runner are on the <a href="lab.html">lab page</a>.</p>
+      <p>The final 8/16/32 profiles will be chosen from the same MIDI song rendered on real
+      hardware, captured as 320 kbps MP3 with CPU/underrun logs. That page is
+      <a href="profiles.html">WIP</a>: hardware, song and captures are still pending.</p>
 
       <h2 id="polyphony">Polyphony and quality</h2>
       <p>The current budget is 8 full voices. Raising it to 16 or 32 is a CPU/quality

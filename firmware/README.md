@@ -42,19 +42,31 @@ The LCD shows the same parameters as the browser emulator.
 ```sh
 git submodule update --init --recursive
 JIELI_TOOLCHAIN=$HOME/.jieli/toolchain ./firmware/build.sh
+# measurement image: adds USB-CDC control and USB audio capture
+REED_LAB=1 ./firmware/build.sh
 ```
 
 Requirements and Docker details are in [../BUILDING.md](../BUILDING.md). Output:
 
 ```
-firmware/build/reed.bin     # bare app image, ~84 KB
-firmware/build/reed.elf     # symbols
-firmware/build/text.bin     # XIP payload
+firmware/build/reed.bin       # release/alpha, ~84 KB
+firmware/build-lab/reed-lab.bin   # lab image, ~88 KB
+firmware/build/reed.elf       # release symbols
+firmware/build-lab/reed-lab.elf # lab symbols
+firmware/build/text.bin       # XIP payload
 ```
 
 The image is linked at `0x02000120` with `firmware/app.ld`. The BSP's
 `tools/get_toolchain.sh` fetches the JieLi clang/ld; the AC79 SDK is only needed
 for a loader/package, which this alpha does not produce.
+
+## Lab image
+
+`REED_LAB=1` builds a measurement image with a USB-CDC console and USB audio
+capture (UAC, 44.1 kHz). It exposes voices, modes, pickup, noise, drag, chain and
+master at runtime; profiles are session-only. The serial protocol and capture
+runner are in [../docs/LAB.md](../docs/LAB.md). The release build has no CDC/UAC
+and keeps the default `HQ_8` profile until the profile-selection run is done.
 
 ## Why there is no installer yet
 

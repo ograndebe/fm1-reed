@@ -24,6 +24,8 @@ código roda no computador, no navegador (WebAssembly) e no JieLi AC79 do FM-1
 
 **Online:** [ograndebe.github.io/fm1-reed](https://ograndebe.github.io/fm1-reed/) ·
 [emulador](https://ograndebe.github.io/fm1-reed/try/) ·
+[lab (WIP)](https://ograndebe.github.io/fm1-reed/lab.html) ·
+[perfis (WIP)](https://ograndebe.github.io/fm1-reed/profiles.html) ·
 [código](https://github.com/ograndebe/fm1-reed)
 
 ## Testar no emulador
@@ -62,6 +64,15 @@ encoders, LCD, MIDI USB e boot guard. **Não tem entrada de atualização/OTA, n
 foi testada num FM-1 e não é uma release instalável.** Leia
 [firmware/README.md](firmware/README.md) e [BUILDING.md](BUILDING.md) antes de
 qualquer tentativa.
+
+## Build de laboratório (WIP)
+
+`REED_LAB=1 ./firmware/build.sh` gera `reed-lab.bin`, uma imagem de medição com
+console USB-CDC e captura de áudio USB (44.1 kHz). Ela permite variar vozes,
+modos, pickup, noise, drag, chain e master no hardware; os perfis são só da
+sessão. A metodologia e a página de escolha dos perfis finais estão em
+[web/profiles.html](web/profiles.html) e [docs/LAB.md](docs/LAB.md) — WIP até
+termos o hardware e a música.
 
 ## Documentação
 

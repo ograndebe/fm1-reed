@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-only
 CC ?= cc
-WR_MAX_VOICES ?= 8
+WR_MAX_VOICES ?= 32
 CFLAGS ?= -O2 -std=c99 -Wall -Wextra -Iengine/include -DWR_MAX_VOICES=$(WR_MAX_VOICES)
 LDLIBS ?= -lm
 BUILD := build

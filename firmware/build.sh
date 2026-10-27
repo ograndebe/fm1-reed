@@ -13,8 +13,10 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 cd "$ROOT"
 TC="${JIELI_TOOLCHAIN:-$HOME/.jieli/toolchain}"
-BSP="${FELUCCA_BSP:-$ROOT/bsp/felucca-bsp}"
+LAB="${REED_LAB:-0}"
 OUT="firmware/build"
+[ "$LAB" = 1 ] && OUT="firmware/build-lab"
+BSP="${FELUCCA_BSP:-$ROOT/bsp/felucca-bsp}"
 
 [ -x "$TC/pi32v2/bin/clang" ] || { echo "build: no JieLi toolchain in $TC"; exit 1; }
 [ -f "$BSP/chip/crt0.S" ] || { echo "build: no felucca-bsp in $BSP (git submodule update --init)"; exit 1; }
@@ -57,9 +59,11 @@ else
     esac
 fi
 
-VOICES="${WR_MAX_VOICES:-8}"
+VOICES="${WR_MAX_VOICES:-32}"
+NAME=reed
+[ "$LAB" = 1 ] && NAME=reed-lab
 CFLAGS="-target pi32v2 -Os -ffunction-sections -fno-builtin -Wall -Wno-unused-function \
- -DWR_MAX_VOICES=$VOICES -Iengine/include -I$BSP_REL/chip -I$BSP_REL/boards/fm1"
+ -DREED_LAB=$LAB -DWR_MAX_VOICES=$VOICES -Iengine/include -I$BSP_REL/chip -I$BSP_REL/boards/fm1"
 
 run "$CC" -target pi32v2 -c "$BSP_REL/chip/crt0.S" -o "$OUT/crt0.o"
 run "$CC" -target pi32v2 -c "$BSP_REL/chip/fm1_vec.S" -o "$OUT/vec.o"
@@ -71,14 +75,14 @@ run "$CC" $CFLAGS -c engine/src/wurli_tables.c -o "$OUT/wurli_tables.o"
 run "$LD" -T firmware/app.ld \
     "$OUT/crt0.o" "$OUT/vec.o" "$OUT/isr.o" \
     "$OUT/main.o" "$OUT/wurli_engine.o" "$OUT/wurli_tables.o" \
-    -o "$OUT/reed.elf"
+    -o "$OUT/$NAME.elf"
 
-run "$OBJCOPY" -O binary -j .text "$OUT/reed.elf" "$OUT/text.bin"
-run "$OBJCOPY" -O binary -j .data "$OUT/reed.elf" "$OUT/data.bin"
-run "$OBJCOPY" -O binary -j .ram_text "$OUT/reed.elf" "$OUT/rt.bin"
-run "$OBJDUMP" -t "$OUT/reed.elf" > "$OUT/symbols.txt"
+run "$OBJCOPY" -O binary -j .text "$OUT/$NAME.elf" "$OUT/text.bin"
+run "$OBJCOPY" -O binary -j .data "$OUT/$NAME.elf" "$OUT/data.bin"
+run "$OBJCOPY" -O binary -j .ram_text "$OUT/$NAME.elf" "$OUT/rt.bin"
+run "$OBJDUMP" -t "$OUT/$NAME.elf" > "$OUT/symbols.txt"
 
-python3 - "$OUT" "$OUT/reed.bin" <<'PY'
+python3 - "$OUT" "$OUT/$NAME.bin" <<'PY'
 import re, sys
 out, dest = sys.argv[1:]
 syms = open(f"{out}/symbols.txt").read()
@@ -99,7 +103,7 @@ for at, part in sorted([(rt_load, open(f"{out}/rt.bin", "rb").read()),
         img += b"\xff" * (at - 0x02000120 - len(img)) + part
 img += b"\xff" * (-len(img) % 4)
 open(dest, "wb").write(img)
-print(f"reed.bin: {len(img)} bytes")
+print(f"{dest.rsplit('/', 1)[-1]}: {len(img)} bytes")
 PY
 
-echo "built $OUT/reed.bin (alpha; no OTA / package yet)"
+echo "built $OUT/$NAME.bin (alpha; no OTA / package yet)"

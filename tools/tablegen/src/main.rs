@@ -32,6 +32,7 @@ const WR_TUNE_N: usize = 101;
 const WR_VOL_N: usize = 128;
 const WR_SIN_N: usize = 1024;
 const WR_SPK_N: usize = 33;
+const WR_GAIN_DB_N: usize = 31;
 
 fn q30(x: f64) -> i32 {
     (x * (1i64 << 30) as f64).round() as i64 as i32
@@ -137,6 +138,8 @@ fn main() {
         let drag = tables::air_drag_db_per_mm_with_config(midi, &cfg);
         let law = pickup_law_for(midi);
         let c_rest = law.eval(-PICKUP_REST_OFFSET_MM);
+        let slope = (law.eval(-PICKUP_REST_OFFSET_MM + 0.001) -
+                     law.eval(-PICKUP_REST_OFFSET_MM - 0.001)) / 0.002;
 
         // Damper: OpenWurli's start_damper(), per 32-sample control block.
         let damper_rate = |m: usize| -> f64 {
@@ -203,8 +206,9 @@ fn main() {
         .unwrap();
         writeln!(
             out,
-            "        .c_rest = {}, .damper_ramp = {},\n        .law = {}, .band = {},\n        .noise_b0 = {}, .noise_b2 = {}, .noise_a1 = {}, .noise_a2 = {},",
+            "        .c_rest = {}, .slope_q30 = {}, .damper_ramp = {},\n        .law = {}, .band = {},\n        .noise_b0 = {}, .noise_b2 = {}, .noise_a1 = {}, .noise_a2 = {},",
             q30(c_rest),
+            q30(slope),
             (ramp_s * FS) as u32,
             law_index(midi),
             if pickup_band_sign(midi) > 0.0 { 1 } else { -1 },
@@ -314,6 +318,17 @@ fn main() {
     for i in 0..WR_SPK_N {
         let c = i as f64 / (WR_SPK_N - 1) as f64;
         write!(out, "{},", q30(1.0 / (1.0 + 0.8 * c))).unwrap();
+        if i % 8 == 7 {
+            out.push('\n');
+        }
+    }
+    out.push_str("};\n\n");
+
+    // Master gain in 1 dB steps, -24..+6 dB, Q24.
+    out.push_str("const int32_t wr_gain_db_tab[WR_GAIN_DB_N] = {\n");
+    for i in 0..WR_GAIN_DB_N {
+        let db = i as f64 - 24.0;
+        write!(out, "{},", q24(10f64.powf(db / 20.0))).unwrap();
         if i % 8 == 7 {
             out.push('\n');
         }

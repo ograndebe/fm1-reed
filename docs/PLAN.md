@@ -24,7 +24,7 @@ audio, polyphony above 8, 48 kHz, MLP corrections, an installer.
   application is not forked. This keeps the new firmware small enough to fit,
   test and reason about.
 - Establish the CPU/memory envelope: 360 MHz pi32v2, no FPU, 96 KB of RAM, about
-  560 KB of XIP flash, 8 voices as the working budget.
+  560 KB of XIP flash, 8 active voices as the default budget (32-slot capacity).
 
 ## Phase 1 — v0.1, desktop engine and emulator (current)
 
@@ -120,7 +120,7 @@ Work:
 | Risk | Mitigation |
 | --- | --- |
 | pi32v2 64-bit multiply/16-bit load bug | Keep tables in 32-bit words, avoid 64-bit divides in hot paths, measure on hardware, add a `noinline` multiply helper if a crash appears. |
-| 8 voices vs 64 | The FM-1 has 27 keys; 8 voices is the compile-time v0.1 budget. Steal quietest/oldest, crossfade 5 ms. Raise `WR_MAX_VOICES` only with measured headroom. |
+| 8 voices vs 64 | The FM-1 has 27 keys; 8 active voices is the default budget (32 static slots). Steal quietest/oldest, crossfade 5 ms. Raise the runtime limit/profile only with measured headroom. |
 | Audio deadline | 128-frame halves (2.9 ms). Measure the worst half on hardware; reduce FX/voice count if over 80 %. |
 | Behavioural chain audibly different | Voice is exact; chain is calibrated. Phase 2 closes the gap; the docs state the difference. |
 | Flash/ROM | 84 KB image now; tables are 30 KB of it. Room for the exact solver and UI. |

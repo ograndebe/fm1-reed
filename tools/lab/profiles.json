@@ -1,0 +1,11 @@
+{
+  "_comment": "Candidate profiles for the Reed LAB profiling run. pickup/chain: 0 full, 1 lite. WIP: names/values are provisional until hardware measurements.",
+  "profiles": [
+    { "name": "HQ_8",    "voices": 8,  "modes": 7, "pickup": 0, "noise": 1, "drag": 1, "chain": 0, "master_db": 0 },
+    { "name": "MQ_12",   "voices": 12, "modes": 5, "pickup": 0, "noise": 1, "drag": 1, "chain": 0, "master_db": 0 },
+    { "name": "MQ_16",   "voices": 16, "modes": 5, "pickup": 0, "noise": 1, "drag": 1, "chain": 0, "master_db": 0 },
+    { "name": "LQ_24",   "voices": 24, "modes": 4, "pickup": 1, "noise": 0, "drag": 0, "chain": 1, "master_db": 0 },
+    { "name": "LQ_32",   "voices": 32, "modes": 3, "pickup": 1, "noise": 0, "drag": 0, "chain": 1, "master_db": 0 },
+    { "name": "FULL_32", "voices": 32, "modes": 7, "pickup": 0, "noise": 1, "drag": 1, "chain": 0, "master_db": -6 }
+  ]
+}

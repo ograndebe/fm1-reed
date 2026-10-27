@@ -38,6 +38,12 @@ wr_note_on(&e, 60, 100);
 wr_note_off(&e, 60);
 wr_set_sustain(&e, 1);
 wr_set_param(&e, WR_P_TREMOLO, 90);
+
+/* lab/measurement profiles (release can hardcode them) */
+wr_set_voice_limit(&e, 16);
+wr_profile_t p = {16, 5, WR_PICKUP_FULL, 1, 1, WR_CHAIN_FULL};
+wr_set_profile(&e, &p);
+wr_set_master_q24(&e, 16777216);   /* 0 dB */
 wr_render(&e, out_q20, frames);
 ```
 
@@ -72,7 +78,7 @@ firmware does not rely on compiler-rt helpers.
 
 ## Voice lifecycle
 
-- **Allocation**: `WR_MAX_VOICES` slots (8 by default, compile-time). A free slot wins; a same-note held voice is
+- **Allocation**: 32 static slots; the runtime `voice_limit` (8 by default) caps active voices. A free slot wins; a same-note held voice is
   retriggered with a 5 ms fade; otherwise the quietest released/oldest voice is
   copied to a fade and the slot restarts.
 - **Note-on**: reads the per-note row (phase rotation, amplitudes, decay,
@@ -143,11 +149,11 @@ what the next phase replaces.
 
 | Item | Size / cost |
 | --- | --- |
-| Engine state (8 voices) | ~6 KB RAM |
+| Engine state (32 voice capacity) | ~16 KB RAM |
 | Audio DMA buffer | 2 × 128 × 2 × 4 B = 2 KB RAM |
 | Tables | ~30 KB flash |
 | Firmware text | ~84 KB total image |
-| Host benchmark | ~169 ns/sample for 8 voices (Apple silicon, 44.1 kHz) |
+| Host benchmark | ~186 ns/sample for 8 active voices (Apple silicon, 44.1 kHz); 32 active ≈ 619 ns |
 | Device budget | 2.9 ms per half buffer; target <70 % used |
 
 The host number is not a device measurement. The Phase 3 exit criteria require

@@ -1,11 +1,23 @@
 # Changelog
 
+## Unreleased
+
+- Engine runtime profiles: `voice_limit` (1..32), modes (1..7), full/lite pickup,
+  noise/drag switches, full/lite chain, master gain. Default remains 8 voices,
+  7 modes, full chain — golden hash unchanged.
+- `REED_LAB=1` firmware: USB-CDC profile/telemetry console, USB audio capture
+  (UAC 44.1 kHz), session-only profiles; release build has no CDC/UAC.
+- `tools/lab/run_profiles.py` WIP capture runner; candidate profiles in
+  `tools/lab/profiles.json`.
+- Lab and profile-selection pages (WIP), docs/LAB.md, docs/POLYPHONY.md.
+- CI: sanitizer, 32-slot capacity, tablegen drift, WAV check, lab runner dry-run.
+
 ## 0.1.0 — 2026-10-26
 
 First public tree.
 
 - Fixed-point Wurlitzer 200A engine in portable C99: 7-mode reed, hammer dwell,
-  electrostatic pickup overlap law, attack noise, 8 voices with 5 ms steal fades,
+  electrostatic pickup overlap law, attack noise, 8 active voices by default (32-slot capacity) with 5 ms steal fades,
   sustain and progressive dampers.
 - Behavioural 200A chain: preamp asymmetry, 5.63 Hz LDR tremolo, volume-pot
   network, 33 Hz feedback shelf, crossover knee, speaker character, DC blocker.
