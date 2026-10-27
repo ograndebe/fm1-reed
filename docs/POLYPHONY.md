@@ -4,6 +4,24 @@ Status: **analysis / design**, not implemented. This document answers how to let
 the FM-1 run more notes by spending less per voice, how to expose that on the
 hardware, and what can go wrong.
 
+## 0. Two builds, one engine
+
+The goal is not to ship a knob for every DSP parameter. It is to have a
+**laboratory build** for measurements, then a **release build** with a few fixed
+profiles.
+
+| Build | Purpose | Controls |
+|---|---|---|
+| **Lab** (`REED_LAB=1`) | Measure on the real FM-1, find safe limits | runtime debug menu + USB-CDC log; voices, modes, pickup, noise, drag, master gain; read-only CPU/underrun counters |
+| **Release** | Normal use | three profiles (`HQ_8`, `MQ_16`, `LQ_32`) selected in a small menu; no raw DSP controls |
+
+The engine is the same. `REED_LAB` only changes the application: it adds the
+debug menu, the console and the settings page. The release build compiles those
+out and uses compile-time defaults.
+
+The lab build must be clearly identified (USB product string and version, e.g.
+`FM-1 Reed LAB 0.1-lab`) so it is never confused with a release image.
+
 ## 1. What exists today
 
 - The engine has a compile-time array of `WR_MAX_VOICES` voices
@@ -125,6 +143,60 @@ Tests should prove it:
 - golden hashes per profile (separate, intentional);
 - on hardware, the CPU meter drops when the profile changes under a sustained
   chord. If it does not, the profile is fake.
+
+## 3.1 What the lab build should expose
+
+**Real DSP controls** (safe to change at runtime, applied on new notes or after a
+fade):
+
+| Control | Range | What it changes |
+|---|---|---|
+| `VOICES` | 1..32 | active voice ceiling; real if allocation respects it |
+| `MODES` | 1..7 | modal modes per voice; the main CPU lever |
+| `PICKUP` | FULL / LITE | full overlap law vs a cheaper approximation |
+| `NOISE` | on/off | hammer attack noise (small CPU, audible transient) |
+| `DRAG` | on/off | amplitude-dependent air drag (tiny CPU) |
+| `CHAIN` | FULL / LITE | optional: full preamp/amp/speaker vs a cheaper chain |
+| `MASTER` | safe dB range | output gain/limiter for comparisons and hearing safety |
+
+**Read-only telemetry** (for the experiment log):
+
+- active voices / configured limit;
+- CPU load per half buffer: recent, average, max (`audio_max_us`);
+- DMA late/underrun count;
+- reset reason and build/profile ID;
+- sample rate, buffer size, firmware version.
+
+**Compile-time only** — do not put these in a runtime menu:
+
+- `WR_MAX_VOICES` (array capacity);
+- audio sample rate and DMA half size;
+- CPU1 / dual-core split;
+- 2× oversampling and the exact circuit chain;
+- clock/PLL, rails, codec/amp registers;
+- flash addresses, loader/UBOOT, raw flash commands.
+
+Runtime `VOICES` is a limit over a fixed capacity of 32. Changing the capacity
+would require recompilation; that is intentional. Do not expose it as a menu
+item and pretend it is dynamic.
+
+## 3.2 Experiment matrix
+
+The lab build should make these combinations quick to select:
+
+| Name | Voices | Modes | Pickup | Noise | Drag |
+|---|---|---|---|---|---|
+| `HQ_8` | 8 | 7 | full | on | on |
+| `MQ_12` | 12 | 5 | full | on | on |
+| `MQ_16` | 16 | 5 | full | on | on |
+| `LQ_24` | 24 | 4 | lite | off | off |
+| `LQ_32` | 32 | 3 | lite | off | off |
+| `FULL_32` | 32 | 7 | full | on | on | deliberately over budget; confirm the failure mode |
+
+Workloads: single note, 8-note chord, 16, 24, 32; with sustain; with tremolo;
+speaker 0 and 100; volume safe/max. Record CPU, underruns, audio level, listening
+notes, case temperature and battery. Repeat on at least two units if possible,
+because CPU1 and flash parts vary.
 
 ## 4. Feasibility estimate
 
@@ -262,6 +334,30 @@ the emulator and hardware share the same output level.
   voice block per profile or hoist the branch. The mode loop bound is a runtime
   value but the compiler can still optimize; measure before micro-optimizing.
 - No change of quality while a chord is held without a fade; it will click.
+
+### Can the lab build make the FM-1 unusable?
+
+- **Voice/quality settings** live in the app and in `FL_XDATA0`; they cannot
+  physically damage the SoC. They can cause audio dropouts, crashes or a boot
+  loop, which are recovered by the watchdog, the two-failed-boots UBOOT guard,
+  a settings CRC/A-B copy and a safe-mode key.
+- **Permanent brick** risk comes from touching the loader/UBOOT or raw flash,
+  from power loss during a firmware update, or from hardware abuse. The lab
+  build should not expose those.
+- **Heat/burn** risk from DSP load alone is low at the stock 360 MHz. The real
+  thermal risks are the speaker/amplifier under sustained clipping and battery
+  drain. Use a master limiter, test at moderate volume, and do not overclock.
+- **CPU1** has documented shared-RAM errata; it can crash/reset but not burn.
+  Use it only with a one-core fallback.
+- **Settings boot loop**: if a saved `LQ_32` profile crashes before the guard is
+  healthy, hold PANIC at boot to ignore settings and load `HQ_8`; or clear
+  settings from UBOOT. This must exist before the lab build is flashed.
+
+With those safeguards, the risk of leaving the unit permanently unusable is
+**low**. The realistic worst case is a crash/reset or a bad flash update, both
+recoverable with the existing rescue/UBOOT path. Without the safeguards, the
+worst case is a boot loop or a corrupted app, still usually recoverable, but a
+pain to diagnose.
 
 ## 9. Recommended order
 
