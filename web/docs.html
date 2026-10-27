@@ -109,7 +109,7 @@
       removes the quantised filter's residual offset.</p>
 
       <h3>Voices and stealing</h3>
-      <p>Ten slots, eight sounding voices. A new note takes a free slot; when all are busy, the
+      <p>Eight voices by default (<code>WR_MAX_VOICES</code>, compile-time). A new note takes a free slot; when all are busy, the
       quietest released/oldest voice is copied into a 5 ms crossfade and the slot restarts.
       Top-five reeds have no damper, as on the real instrument. Sustain (CC64) is supported.</p>
 

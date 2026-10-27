@@ -24,8 +24,11 @@ extern "C" {
 
 #define WR_SR 44100
 #define WR_BLOCK 32
-#define WR_MAX_VOICES 10
-#define WR_ACTIVE_VOICES 8
+/* Polyphony budget. 8 is the v0.1 device budget; it can be raised at compile
+ * time (-DWR_MAX_VOICES=10) once the FM-1 render time is measured. */
+#ifndef WR_MAX_VOICES
+#define WR_MAX_VOICES 8
+#endif
 
 /* Parameters: 0..127, except WR_P_TUNE (-50..+50 cents). */
 enum {

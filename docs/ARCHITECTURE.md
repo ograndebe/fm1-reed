@@ -72,7 +72,7 @@ firmware does not rely on compiler-rt helpers.
 
 ## Voice lifecycle
 
-- **Allocation**: ten slots. A free slot wins; a same-note held voice is
+- **Allocation**: `WR_MAX_VOICES` slots (8 by default, compile-time). A free slot wins; a same-note held voice is
   retriggered with a 5 ms fade; otherwise the quietest released/oldest voice is
   copied to a fade and the slot restarts.
 - **Note-on**: reads the per-note row (phase rotation, amplitudes, decay,
@@ -143,7 +143,7 @@ what the next phase replaces.
 
 | Item | Size / cost |
 | --- | --- |
-| Engine state (10 voices) | ~8 KB RAM |
+| Engine state (8 voices) | ~6 KB RAM |
 | Audio DMA buffer | 2 × 128 × 2 × 4 B = 2 KB RAM |
 | Tables | ~30 KB flash |
 | Firmware text | ~84 KB total image |

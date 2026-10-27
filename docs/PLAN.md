@@ -119,7 +119,7 @@ Work:
 | Risk | Mitigation |
 | --- | --- |
 | pi32v2 64-bit multiply/16-bit load bug | Keep tables in 32-bit words, avoid 64-bit divides in hot paths, measure on hardware, add a `noinline` multiply helper if a crash appears. |
-| 8 voices vs 64 | The FM-1 has 27 keys; 8 sounding voices is the budget. Steal quietest/oldest, crossfade 5 ms. Increase only with measured headroom. |
+| 8 voices vs 64 | The FM-1 has 27 keys; 8 voices is the compile-time v0.1 budget. Steal quietest/oldest, crossfade 5 ms. Raise `WR_MAX_VOICES` only with measured headroom. |
 | Audio deadline | 128-frame halves (2.9 ms). Measure the worst half on hardware; reduce FX/voice count if over 80 %. |
 | Behavioural chain audibly different | Voice is exact; chain is calibrated. Phase 2 closes the gap; the docs state the difference. |
 | Flash/ROM | 84 KB image now; tables are 30 KB of it. Room for the exact solver and UI. |

@@ -85,7 +85,7 @@ modal reed (7 modes) → hammer dwell/onset → electrostatic pickup
   the drawn volume-pot network, 33 Hz feedback shelf, closed-loop power amp with
   crossover distortion, and the 4×8″ speaker.
 - **Fixed point**: Q30 reed/pickup, Q24 gain staging, Q28 biquads, Q32 phase,
-  32×32→64 MACs. Ten voice slots, eight sounding voices, 5 ms steal crossfade.
+  32×32→64 MACs. Eight voices (compile-time budget), 5 ms steal crossfade.
 
 ### Fidelity
 

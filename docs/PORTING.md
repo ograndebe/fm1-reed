@@ -158,7 +158,7 @@ crossover knee in the firmware chain recovers most of it (about 3 dB short above
 
 ## Known limitations
 
-- 8 sounding voices (10 slots), not OpenWurli's 64.
+- 8 voices by default (`WR_MAX_VOICES`, compile-time), not OpenWurli's 64.
 - 44.1 kHz only. The I2S runs at 44.1176 kHz; the 0.04 % difference is 0.7 cents.
 - The keybed velocity is fixed at 100 in the alpha firmware.
 - The tremolo is amplitude modulation, not the circuit's timbral modulation.
