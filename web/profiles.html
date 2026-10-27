@@ -58,14 +58,15 @@
       single notes, bass, chords, sustain, tremolo and dense passages. It is chosen later; the
       runner accepts any Standard MIDI File.</p></div></div>
       <div class="step"><div><h3>Run on the FM-1</h3><p>The lab firmware sets each profile over
-      USB-CDC, plays the song over USB-MIDI and records the same 24-bit output the DAC gets
-      through USB audio.</p></div></div>
+      USB-MIDI CCs, plays the song on the same MIDI port and records the P2 analog output
+      through an audio interface. UAC is optional.</p></div></div>
       <div class="step"><div><h3>Capture and measure</h3><p>ffmpeg records WAV, converts to
       a loudness-matched 320 kbps MP3, and the run log stores CPU load, max render µs, late
       halves and active voices before/after each take.</p></div></div>
       <div class="step"><div><h3>Listen blind</h3><p>MP3s are labelled by code, not by profile
-      name. Listeners rate attack detail, bark, tuning, noise and musical usefulness without
-      knowing which profile is which.</p></div></div>
+      name and loudness-matched. Listeners rate attack detail, bark, tuning, noise and musical
+      usefulness without knowing which profile is which. The timbre pass is dry (tremolo off);
+      a second pass can include tremolo if needed.</p></div></div>
       <div class="step"><div><h3>Freeze three profiles</h3><p>Pick the highest quality that
       stays under the CPU/underrun safety margin, plus a 16-voice and a 32-voice option if the
       measurements support them. The release hardcodes them.</p></div></div>
@@ -84,24 +85,24 @@
       <tr><td>FULL_32</td><td>32</td><td>7</td><td>full</td><td>on</td><td>on</td><td>control: expected to overrun</td></tr>
     </table>
     <p class="muted">Values are provisional; they are the starting matrix, not the final answer.
-    The profiles are defined in <code>tools/lab/profiles.json</code>.</p>
+    The profiles are defined in <code>tools/lab/profiles.json</code>. The test song must not
+    contain CC20..27 (those are the profile controls).</p>
   </section>
 
   <section class="section">
     <h2>Capture pipeline</h2>
     <div class="flow">
-      <span>profiles.json</span><i>→</i><span>CDC profile command</span><i>→</i>
+      <span>profiles.json</span><i>→</i><span>MIDI CC profile</span><i>→</i>
       <span>FM-1 lab firmware</span><i>→</i><span>MIDI song</span><i>→</i>
-      <span>UAC capture</span><i>→</i><span>WAV + 320k MP3</span><i>→</i>
+      <span>P2 / UAC capture</span><i>→</i><span>WAV + 320k MP3</span><i>→</i>
       <span>results.csv</span>
     </div>
     <pre>python3 tools/lab/run_profiles.py \
-  --serial /dev/cu.usbmodemXXXX \
   --midi-out "FM-1 Reed LAB" \
   --audio-input "-f avfoundation -i :2" \
   --song assets/lab/song.mid \
   --profiles tools/lab/profiles.json \
-  --out captures/lab --repeats 3</pre>
+  --out captures/lab --repeats 3 --blind</pre>
     <p>See <a href="lab.html">the lab build page</a> for the serial protocol, build command
     and safety notes.</p>
   </section>

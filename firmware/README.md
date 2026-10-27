@@ -13,7 +13,8 @@ There is no OTA entry and no `.fwsc` package.
 - Plays the 27 keys through the engine; sends note on/off and parameters through
   a 64-entry queue to the audio interrupt.
 - Reads USB-MIDI input (the BSP's class-compliant MIDI device) for notes, CC64
-  sustain and CC7/CC1/CC11 volume/tremolo/drive.
+  sustain, CC7/CC1/CC11 volume/tremolo/drive, and (lab build) CC20..27 profile
+  control.
 - Draws the five parameters, note, voice count and octave on the LCD.
 - Falls back to UBOOT if two consecutive boots do not reach 2 s in the main loop.
 
@@ -62,9 +63,10 @@ for a loader/package, which this alpha does not produce.
 
 ## Lab image
 
-`REED_LAB=1` builds a measurement image with a USB-CDC console and USB audio
-capture (UAC, 44.1 kHz). It exposes voices, modes, pickup, noise, drag, chain and
-master at runtime; profiles are session-only. The serial protocol and capture
+`REED_LAB=1` builds a measurement image with USB-MIDI CC profile control
+(CC20..27), an optional USB-CDC telemetry console and USB audio capture (UAC,
+44.1 kHz). It exposes voices, modes, pickup, noise, drag, chain and master at
+runtime; profiles are session-only. The primary audio capture is the P2 output. The serial protocol and capture
 runner are in [../docs/LAB.md](../docs/LAB.md). The release build has no CDC/UAC
 and keeps the default `HQ_8` profile until the profile-selection run is done.
 

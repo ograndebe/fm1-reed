@@ -242,10 +242,11 @@ python3 -m http.server -d web 8080
       </table>
 
       <h2 id="lab">Lab build and profile selection</h2>
-      <p><code>REED_LAB=1 ./firmware/build.sh</code> builds a measurement image with a
-      USB-CDC console (runtime voices/modes/pickup/noise/drag/chain/master) and USB audio
-      capture at 44.1 kHz. It is not a release. The serial protocol, safety notes and capture
-      runner are on the <a href="lab.html">lab page</a>.</p>
+      <p><code>REED_LAB=1 ./firmware/build.sh</code> builds a measurement image with
+      MIDI-CC profile control (CC20..27), an optional USB-CDC telemetry console and optional
+      USB audio capture at 44.1 kHz. The primary capture is the P2 analog output. It is not a
+      release. The CC map, serial protocol, safety notes and capture runner are on the
+      <a href="lab.html">lab page</a>.</p>
       <p>The final 8/16/32 profiles will be chosen from the same MIDI song rendered on real
       hardware, captured as 320 kbps MP3 with CPU/underrun logs. That page is
       <a href="profiles.html">WIP</a>: hardware, song and captures are still pending.</p>

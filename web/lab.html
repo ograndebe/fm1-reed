@@ -41,7 +41,7 @@
         <dt><span class="pill wip">WIP</span> Captures</dt><dd>none published</dd>
         <dt>Lab image</dt><dd><code>reed-lab.bin</code></dd>
         <dt>Control</dt><dd>USB-CDC console</dd>
-        <dt>Capture</dt><dd>USB audio 44.1 kHz</dd>
+        <dt>Capture</dt><dd>P2 analog / UAC optional</dd>
         <dt>Release</dt><dd>fixed profiles only</dd>
       </dl>
     </aside>
@@ -77,7 +77,29 @@
   </section>
 
   <section class="section">
-    <h2>Serial protocol</h2>
+    <h2>MIDI CC control (primary)</h2>
+    <p>The capture runner sets profiles over USB-MIDI CCs, then plays the song on the same
+    port. Any MIDI channel is accepted.</p>
+    <table class="status">
+      <tr><th>CC</th><th>Parameter</th><th>Values</th></tr>
+      <tr><td>20</td><td>VOICES</td><td>1..32</td></tr>
+      <tr><td>21</td><td>MODES</td><td>1..7</td></tr>
+      <tr><td>22</td><td>PICKUP</td><td>0 full, 127 lite</td></tr>
+      <tr><td>23</td><td>NOISE</td><td>0 off, 127 on</td></tr>
+      <tr><td>24</td><td>DRAG</td><td>0 off, 127 on</td></tr>
+      <tr><td>25</td><td>CHAIN</td><td>0 full, 127 lite</td></tr>
+      <tr><td>26</td><td>MASTER</td><td>0..30 = −24..+6 dB</td></tr>
+      <tr><td>27</td><td>COMMIT</td><td>&gt;=64</td></tr>
+      <tr><td>120 / 123</td><td>all sound off / all notes off</td><td>0</td></tr>
+      <tr><td>1 / 7 / 11 / 64</td><td>tremolo / volume / drive / sustain</td><td>existing</td></tr>
+    </table>
+    <p class="lab-note">CC20..26 only stage a profile; CC27 commits it. There is no MIDI
+    acknowledgement, so the runner waits a settle time. The test song must not use CC20..27.
+    USB MIDI only in this alpha; TRS/DIN MIDI is not implemented yet.</p>
+  </section>
+
+  <section class="section">
+    <h2>Serial protocol (telemetry)</h2>
     <p>115200 8N1 over the CDC port; one line per command. Profiles are session-only:
     power-on returns to the default, so a bad setting cannot persist into a boot loop.</p>
     <table class="status">
@@ -99,21 +121,22 @@ STAT active=0 limit=16 last_us=1200 max_us=1800 late=0 cpu=41</pre>
     <h2>Capture path</h2>
     <div class="flow">
       <span>MIDI song</span><i>→</i><span>FM-1 USB-MIDI</span><i>→</i>
-      <span>Reed LAB engine</span><i>→</i><span>USB audio (UAC)</span><i>→</i>
+      <span>Reed LAB engine</span><i>→</i><span>P2 analog (UAC optional)</span><i>→</i>
       <span>ffmpeg</span><i>→</i><span>WAV / 320k MP3</span>
     </div>
-    <p style="margin-top:1rem">The runner <code>tools/lab/run_profiles.py</code> does the loop:
-    set profile → query stats → play the same MIDI song → record → repeat. It is a WIP
-    skeleton until the hardware and song are chosen.</p>
+    <p style="margin-top:1rem">The primary capture is the FM-1's <strong>P2 analog output</strong>
+    into an audio interface/line-in. The runner <code>tools/lab/run_profiles.py</code> does the
+    loop: send profile CCs → play the same MIDI song → record P2 → repeat. It is a WIP skeleton
+    until the hardware and song are chosen. UAC is an optional alternative; it is not required.</p>
     <pre>python3 tools/lab/run_profiles.py \
-  --serial /dev/cu.usbmodemXXXX \
   --midi-out "FM-1 Reed LAB" \
   --audio-input "-f avfoundation -i :2" \
   --song assets/lab/song.mid \
   --profiles tools/lab/profiles.json \
   --out captures/lab --repeats 3</pre>
-    <p class="muted">If UAC is not visible, record the FM-1's analog output into an audio
-    interface and pass that input instead.</p>
+    <p class="muted">Connect P2 to an audio interface, set a level that does not clip, and pass
+    that ffmpeg input. <code>--serial</code> is optional and only adds CDC telemetry. UAC is
+    optional too.</p>
   </section>
 
   <section class="section">

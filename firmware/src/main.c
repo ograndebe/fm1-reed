@@ -73,7 +73,7 @@ static struct { uint32_t magic, pending, failed; } guard __attribute__((section(
  * parameter id 7..0 (for PARAM, value in 23..16). */
 enum {
     EV_NOTE_ON = 1u << 29, EV_NOTE_OFF = 2u << 29, EV_PARAM = 3u << 29,
-    EV_PANIC = 4u << 29, EV_SUSTAIN = 5u << 29
+    EV_PANIC = 4u << 29, EV_SUSTAIN = 5u << 29, EV_ALL_OFF = 6u << 29
 };
 #define EVQ 64u
 static volatile uint32_t evq[EVQ];
@@ -108,6 +108,10 @@ static void ev_panic(void)
 {
     ev_put(EV_PANIC);
 }
+static void ev_all_off(void)
+{
+    ev_put(EV_ALL_OFF);
+}
 static void ev_sustain(int on)
 {
     ev_put(EV_SUSTAIN | (on ? 1u << 16 : 0u));
@@ -135,6 +139,9 @@ static void ev_drain(void)
         case EV_SUSTAIN:
             wr_set_sustain(&eng, (int)((ev >> 16) & 1u));
             break;
+        case EV_ALL_OFF:
+            wr_all_notes_off(&eng);
+            break;
         }
     }
 }
@@ -143,6 +150,14 @@ static void ev_drain(void)
 #if REED_LAB
 static char lab_line[64];
 static uint32_t lab_len;
+static wr_profile_t cc_profile;
+static int32_t cc_master_db;
+
+static void cc_sync_from_engine(int32_t master_db)
+{
+    cc_profile = wr_get_profile(&eng);
+    cc_master_db = master_db;
+}
 
 static void lab_putc(char c)
 {
@@ -226,6 +241,7 @@ static void lab_set_default(void)
     wr_set_profile(&eng, &p);
     wr_set_master_q24(&eng, wr_gain_db_tab[24]); /* 0 dB */
     fm1_irq_on();
+    cc_sync_from_engine(0);
 }
 
 static void lab_profile(const char *q)
@@ -264,6 +280,7 @@ static void lab_profile(const char *q)
         lab_puts("ERR profile\n");
         return;
     }
+    cc_sync_from_engine(db);
     lab_puts("OK ");
     lab_u32((uint32_t)wr_get_voice_limit(&eng));
     lab_putc(' ');
@@ -618,6 +635,33 @@ static void midi_usb(void)
                 ev_param(WR_P_TREMOLO, d2);
             else if (d1 == 11)
                 ev_param(WR_P_DRIVE, d2);
+#if REED_LAB
+            else if (d1 == 20)
+                cc_profile.voices = (uint8_t)(d2 < 1 ? 1 : d2 > WR_MAX_VOICES ? WR_MAX_VOICES : d2);
+            else if (d1 == 21)
+                cc_profile.modes = (uint8_t)(d2 < 1 ? 1 : d2 > WR_NMODES ? WR_NMODES : d2);
+            else if (d1 == 22)
+                cc_profile.pickup = d2 >= 64 ? WR_PICKUP_LITE : WR_PICKUP_FULL;
+            else if (d1 == 23)
+                cc_profile.noise = d2 >= 64 ? 1 : 0;
+            else if (d1 == 24)
+                cc_profile.drag = d2 >= 64 ? 1 : 0;
+            else if (d1 == 25)
+                cc_profile.chain = d2 >= 64 ? WR_CHAIN_LITE : WR_CHAIN_FULL;
+            else if (d1 == 26)
+                cc_master_db = (int32_t)(d2 > 30 ? 30 : d2) - 24;
+            else if (d1 == 27 && d2 >= 64) {
+                fm1_irq_off();
+                wr_all_notes_off(&eng);
+                int ok = wr_set_profile(&eng, &cc_profile);
+                if (ok)
+                    wr_set_master_q24(&eng, wr_gain_db_tab[cc_master_db + 24]);
+                fm1_irq_on();
+            } else if (d1 == 120)
+                ev_panic();
+            else if (d1 == 123)
+                ev_all_off();
+#endif
         }
     }
     if (midi_in_overflow) {
@@ -664,6 +708,9 @@ static void app_main(void)
     wr_init(&eng, 44100);
     for (int i = 0; i < 5; i++)
         wr_set_param(&eng, i, params[i]);
+#if REED_LAB
+    cc_sync_from_engine(0);
+#endif
     fm1_audio_init(abuf, HALF_WORDS, isr_alnk0, 3);
     lcd_init();
     draw_static();

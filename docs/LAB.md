@@ -26,10 +26,38 @@ compile-time profile (currently `HQ_8` until the measurements are done).
 **Do not confuse the two binaries.** The lab image is for measurements; it is not
 a release and has not been validated on hardware.
 
-## Serial protocol
+## MIDI CC control (primary)
+
+The lab image accepts MIDI CCs on the USB-MIDI port, on any channel. This is the
+path used by the capture runner: send CCs, commit, then play the song on the
+same port.
+
+| CC | Meaning | Values |
+|---|---|---|
+| 20 | VOICES | 1..32 |
+| 21 | MODES | 1..7 |
+| 22 | PICKUP | 0 full, 127 lite |
+| 23 | NOISE | 0 off, 127 on |
+| 24 | DRAG | 0 off, 127 on |
+| 25 | CHAIN | 0 full, 127 lite |
+| 26 | MASTER | 0..30 = −24..+6 dB, 1 dB steps |
+| 27 | COMMIT profile | >=64 |
+| 120 | all sound off | 0 |
+| 123 | all notes off | 0 |
+| 1 / 7 / 11 / 64 | tremolo / volume / drive / sustain | existing controls |
+
+The CCs 20..26 only stage a profile; CC27 commits it. The firmware sends no MIDI
+acknowledgement, so the runner waits a settle time. Existing CCs (1/7/11/64) are
+not staged. The test MIDI file must not use CC20..27; the runner sets the profile
+before playback.
+
+USB MIDI only in this alpha: TRS/DIN MIDI is not implemented yet.
+
+## Serial protocol (telemetry / CDC control)
 
 115200 8N1 over the CDC port (the baud rate is ignored by USB CDC). Commands are
-one line; responses are one line.
+one line; responses are one line. This is optional when using MIDI CCs; it gives
+CPU/underrun telemetry.
 
 | Command | Meaning |
 |---|---|
@@ -56,20 +84,23 @@ a boot loop.
 
 ## Capture
 
-The lab UAC input exposes the FM-1 as a USB audio device at 44.1 kHz. Record it
-with any host tool (ffmpeg, a DAW, or the runner below). If the host does not see
-the UAC interface (macOS USB composite quirks), fall back to the FM-1's analog
-output into an audio interface and pass that input to the runner.
+**P2/analog is the primary capture path.** Connect the FM-1 P2 output to an audio
+interface/line-in, set a level that does not clip, and pass that ffmpeg input to
+the runner.
+
+The lab image also exposes a USB audio (UAC) input at 44.1 kHz. It is convenient
+but not required; if the host does not see it (macOS composite quirks), use the P2
+path. The runner records either one.
 
 ## Runner (WIP)
 
 `tools/lab/run_profiles.py`:
 
-- opens the CDC port and sets each profile;
+- sends the profile over MIDI CCs (default) or the CDC console (`--control cdc`);
 - plays the same MIDI file on the FM-1's USB-MIDI port;
-- records the UAC input with ffmpeg;
+- records the P2 input with ffmpeg (or UAC);
 - writes WAV + loudness-matched 320 kbps MP3 + a CSV/JSON result set;
-- queries CPU/underruns before and after each take.
+- optionally queries CPU/underruns over CDC if `--serial` is given.
 
 The song and the capture device are not chosen yet. The script is a working
 skeleton, not a claim that captures exist. See
