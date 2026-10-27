@@ -313,10 +313,16 @@
     ctx2d.moveTo(0, h / 2); ctx2d.lineTo(w, h / 2); ctx2d.stroke();
     if (!powered || !analyser) return;
     analyser.getFloatTimeDomainData(wave);
+    let peak = 0;
+    for (let i = 0; i < wave.length; i++) {
+      const a = Math.abs(wave[i]);
+      if (a > peak) peak = a;
+    }
+    const g = peak > 0.002 ? Math.min(0.9 / peak, 12) : 1;
     ctx2d.beginPath();
     for (let i = 0; i < wave.length; i++) {
       const x = (i / (wave.length - 1)) * w;
-      const y = h / 2 - wave[i] * (h / 2) * 0.9;
+      const y = h / 2 - wave[i] * (h / 2) * g;
       i ? ctx2d.lineTo(x, y) : ctx2d.moveTo(x, y);
     }
     ctx2d.strokeStyle = '#e0a94a';

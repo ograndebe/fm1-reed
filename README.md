@@ -1,5 +1,8 @@
 # Reed
 
+[![CI](https://github.com/ograndebe/fm1-reed/actions/workflows/ci.yml/badge.svg)](https://github.com/ograndebe/fm1-reed/actions/workflows/ci.yml)
+[![Pages](https://github.com/ograndebe/fm1-reed/actions/workflows/pages.yml/badge.svg)](https://ograndebe.github.io/fm1-reed/)
+
 **A Wurlitzer 200A, rebuilt in fixed point for the M-VAVE FM-1.**
 
 Reed is an open-source custom firmware project for the M-VAVE FM-1. The sound is a
@@ -26,6 +29,8 @@ same source builds for the host, for WebAssembly and for the FM-1's JieLi AC79
 | FM-1 firmware | **alpha** — builds a bring-up image; not validated on hardware |
 | Web installer | **planned** — no image is published before hardware validation |
 | Licence | GPL-3.0-only |
+
+![Reed emulator](web/assets/emulator.png)
 
 ## Try it
 
