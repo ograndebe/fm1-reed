@@ -22,6 +22,10 @@ código roda no computador, no navegador (WebAssembly) e no JieLi AC79 do FM-1
 | Instalador web | **planejado** — nenhuma imagem será publicada antes da validação |
 | Licença | GPL-3.0-only |
 
+**Online:** [ograndebe.github.io/fm1-reed](https://ograndebe.github.io/fm1-reed/) ·
+[emulador](https://ograndebe.github.io/fm1-reed/try/) ·
+[código](https://github.com/ograndebe/fm1-reed)
+
 ## Testar no emulador
 
 ```sh

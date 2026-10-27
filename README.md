@@ -13,7 +13,11 @@ same source builds for the host, for WebAssembly and for the FM-1's JieLi AC79
 [felucca-bsp](https://github.com/hugelton/felucca-bsp), extracted from
 [Felucca](https://github.com/hugelton/Felucca).
 
-[Português](README.pt-BR.md) · [Documentation](web/docs.html) · [Emulator](web/try/index.html) · [Plan](docs/PLAN.md)
+**Live:** [ograndebe.github.io/fm1-reed](https://ograndebe.github.io/fm1-reed/) ·
+[Emulator](https://ograndebe.github.io/fm1-reed/try/) ·
+[Documentation](https://ograndebe.github.io/fm1-reed/docs.html) ·
+[Source](https://github.com/ograndebe/fm1-reed) ·
+[Português](README.pt-BR.md) · [Plan](docs/PLAN.md)
 
 | | |
 |---|---|
@@ -40,7 +44,7 @@ keyboard (Web MIDI). The five sliders are the same parameters as the firmware:
 volume, tremolo, drive, speaker character and tune.
 
 The site under `web/` is plain static HTML/CSS/JS. `.github/workflows/pages.yml`
-publishes it to GitHub Pages; the URL is `https://<user>.github.io/fm1-reed/`.
+publishes it to GitHub Pages at <https://ograndebe.github.io/fm1-reed/>.
 
 ## Quick start (host)
 
