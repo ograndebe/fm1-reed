@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reed — FM-1 emulator</title>
+<meta name="description" content="Play the Reed Wurlitzer 200A engine in your browser. A fixed-point physical model for the M-VAVE FM-1.">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body class="try">
+<header class="try-head">
+  <a class="brand" href="../index.html"><strong>REED</strong><span>FM-1 · Wurlitzer 200A</span></a>
+  <div class="links">
+    <a href="../index.html">Home</a>
+    <a href="https://github.com/hal0zer0/openwurli" target="_blank" rel="noopener">OpenWurli</a>
+    <a href="https://github.com/hugelton/Felucca" target="_blank" rel="noopener">Felucca</a>
+  </div>
+</header>
+
+<main class="try-main">
+  <section class="instrument" aria-label="FM-1 emulator">
+    <div class="badge">REED · MODEL 200A</div>
+
+    <div class="lcd-row">
+      <div class="lcd" aria-live="polite">
+        <div class="l1">M-VAVE FM-1 · CUSTOM FIRMWARE</div>
+        <div class="l2" id="note-readout">WURLITZER 200A</div>
+        <div class="l3" id="lcd-status">8-VOICE PHYSICAL MODEL · 44.1 kHz</div>
+      </div>
+      <div class="scope-wrap"><canvas id="scope" width="440" height="128"></canvas></div>
+    </div>
+
+    <div class="controls">
+      <div class="ctrl">
+        <label for="volume">Volume <output for="volume"></output></label>
+        <input id="volume" type="range" min="0" max="127" value="102">
+      </div>
+      <div class="ctrl">
+        <label for="tremolo">Tremolo <output for="tremolo"></output></label>
+        <input id="tremolo" type="range" min="0" max="127" value="64">
+      </div>
+      <div class="ctrl">
+        <label for="drive">Drive <output for="drive"></output></label>
+        <input id="drive" type="range" min="0" max="127" value="64">
+      </div>
+      <div class="ctrl">
+        <label for="speaker">Speaker <output for="speaker"></output></label>
+        <input id="speaker" type="range" min="0" max="127" value="90">
+      </div>
+      <div class="ctrl">
+        <label for="tune">Tune <output for="tune"></output></label>
+        <input id="tune" type="range" min="-50" max="50" value="0">
+      </div>
+    </div>
+
+    <div class="keyboard" id="keyboard" aria-label="27-key keyboard, F3 to G5"></div>
+
+    <div class="transport">
+      <button class="mini power off" id="power">POWER</button>
+      <button class="mini" id="sustain">SUSTAIN</button>
+      <button class="mini danger" id="panic">PANIC</button>
+      <button class="mini" id="oct-down">OCT −</button>
+      <button class="mini" id="oct-up">OCT +</button>
+      <button class="mini" id="reset">RESET</button>
+      <span class="spacer"></span>
+      <span class="mini" id="octave-readout">OCT <span id="octave">0</span></span>
+    </div>
+
+    <div class="statusline">
+      <span>AUDIO <b id="audio-status" style="color:var(--amber)">STOPPED</b></span>
+      <span>RATE <b id="rate">—</b></span>
+      <span>VOICES <b id="voices">0</b></span>
+      <span id="midi-status">MIDI: —</span>
+    </div>
+
+    <div class="overlay" id="overlay">
+      <div class="box">
+        <h2>Reed</h2>
+        <p>A fixed-point Wurlitzer 200A model, running in your browser. Click to start the audio engine, then play the keys.</p>
+        <button class="btn primary" id="overlay-power">Power on</button>
+        <p class="hint" id="overlay-msg">Headphones recommended · no samples, all synthesis</p>
+      </div>
+    </div>
+  </section>
+
+  <p class="hint">
+    Computer keyboard: <b>A W S E D F T G Y H U J K</b> · octave <b>Z / X</b> · sustain <b>Space</b>.
+    A MIDI keyboard is connected automatically after power-on.
+  </p>
+  <p class="hint">8 voices · 44.1 kHz · mono model · Chrome or Edge for Web MIDI</p>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

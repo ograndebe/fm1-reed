@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reed — documentation</title>
+<meta name="description" content="Architecture, porting notes, calibration, build and firmware documentation for the Reed FM-1 engine.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/style.css">
+<style>
+  .doc { display: grid; grid-template-columns: 220px 1fr; gap: 2.5rem; padding: 2rem 0 4rem; }
+  .doc nav { position: sticky; top: 1rem; align-self: start; font-size: .85rem; }
+  .doc nav a { display: block; padding: .25rem 0; color: var(--cream-dim); }
+  .doc nav a:hover { color: var(--amber); }
+  .doc h2 { margin-top: 2.6rem; }
+  .doc h2:first-child { margin-top: 0; }
+  .doc h3 { margin-top: 1.6rem; color: var(--amber); }
+  .doc ul { color: var(--cream-dim); }
+  .doc li { margin: .25rem 0; }
+  .doc .note { border-left: 2px solid var(--amber-soft); padding: .2rem 0 .2rem 1rem; color: var(--cream-dim); }
+  .doc table { width: 100%; border-collapse: collapse; font-size: .88rem; margin: 1rem 0; }
+  .doc td, .doc th { border-bottom: 1px solid var(--line); padding: .5rem .4rem; text-align: left; vertical-align: top; }
+  .doc th { color: var(--cream-dim); font-weight: 500; }
+  @media (max-width: 800px) { .doc { grid-template-columns: 1fr; } .doc nav { position: static; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="nav">
+    <a class="brand" href="index.html"><strong>REED</strong><span>FM-1 · Wurlitzer 200A</span></a>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="try/index.html">Emulator</a>
+      <a href="#build">Build</a>
+      <a href="#licence">Licence</a>
+    </nav>
+  </header>
+
+  <div class="doc">
+    <nav aria-label="Contents">
+      <a href="#overview">Overview</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#porting">Porting notes</a>
+      <a href="#calibration">Calibration</a>
+      <a href="#build">Build and test</a>
+      <a href="#firmware">Firmware</a>
+      <a href="#emulator">Emulator</a>
+      <a href="#plan">Plan</a>
+      <a href="#licence">Licence and credits</a>
+    </nav>
+
+    <main>
+      <h1 style="font-size:2.6rem">Documentation</h1>
+      <p class="lead">The canonical, versioned documents live in <code>docs/</code> in the source
+      tree. This page is the map and the short version.</p>
+
+      <h2 id="overview">Overview</h2>
+      <p><strong>Reed</strong> puts a Wurlitzer 200A physical model on the M-VAVE FM-1, a
+      27-key MIDI keyboard built around the JieLi AC79 (pi32v2, 360 MHz, no FPU). The project
+      has three pieces:</p>
+      <ul>
+        <li><strong>Engine</strong> — portable C99, fixed point only, 44.1 kHz, 8 voices, mono.
+        It is the same source on the host, in WebAssembly and on the device.</li>
+        <li><strong>Firmware</strong> — the FM-1 application: key scan, encoders, LCD, USB MIDI,
+        audio DMA and settings, built on <code>felucca-bsp</code> (the hardware layer extracted
+        from Felucca).</li>
+        <li><strong>Tooling</strong> — the table generator, the offline WAV/MIDI renderer, the
+        test suite and the browser emulator.</li>
+      </ul>
+      <p class="note">Working title. Reed is unofficial and not affiliated with M-VAVE, JieLi,
+      Hügelton Instruments or the OpenWurli authors.</p>
+
+      <h2 id="architecture">Architecture</h2>
+      <pre>tools/tablegen (Rust, OpenWurli) ──► engine/src/wurli_tables.c
+                                            │
+                     engine/src/wurli_engine.c (C99, fixed point)
+                        │                 │                  │
+                  tools/render        web/wasm_glue.c     firmware/src
+                  (WAV / MIDI)        (AudioWorklet)      (felucca-bsp)</pre>
+      <p>The engine is deliberately freestanding: no libc, no libm, no allocation, no floats.
+      That is what lets one binary-identical model run on a desktop, in a browser and on the
+      AC79. The only platform input is <code>engine/include/wurli_tables.h</code>, generated
+      data.</p>
+
+      <h3>Number formats</h3>
+      <table>
+        <tr><th>Stage</th><th>Format</th><th>Note</th></tr>
+        <tr><td>Reed state, pickup</td><td>Q30</td><td>1.0 = 2<sup>30</sup>; 32×32→64 products</td></tr>
+        <tr><td>FX and gain</td><td>Q24</td><td>1.0 = 2<sup>24</sup></td></tr>
+        <tr><td>Biquad coefficients</td><td>Q28</td><td>DF-II transposed</td></tr>
+        <tr><td>Public output</td><td>Q20</td><td>1.0 = 2<sup>20</sup>, mono</td></tr>
+        <tr><td>Phase</td><td>Q32</td><td>2<sup>32</sup> = one cycle</td></tr>
+      </table>
+
+      <h3>Voice</h3>
+      <p>Each voice has seven quadrature modes (Q30). Mode amplitudes include the per-note
+      variation and the velocity scale; the hammer dwell is a Gaussian applied at note-on.
+      The pickup is a natural cubic spline over a 2D field-solved capacitance law, followed by
+      the trapezoidal node recursion. The pickup's <code>m</code> (node capacitance) is
+      evaluated per sample; the reciprocal is held at its rest value because it moves by less
+      than 0.3&nbsp;% over a full swing (documented simplification, below audibility).</p>
+
+      <h3>Shared chain</h3>
+      <p>After the voice sum: input coupling high-pass, preamp asymmetry, Tremolo
+      (Twin-T rate 5.63 Hz → CdS LDR attack/release → depth divider), the drawn 10 kΩ volume
+      pot with R-11, the 33 Hz feedback shelf, the power amp's closed-loop gain and crossover
+      knee, and the speaker polynomial + 30 Hz/6.5 kHz filters. A final 12 Hz DC blocker
+      removes the quantised filter's residual offset.</p>
+
+      <h3>Voices and stealing</h3>
+      <p>Ten slots, eight sounding voices. A new note takes a free slot; when all are busy, the
+      quietest released/oldest voice is copied into a 5 ms crossfade and the slot restarts.
+      Top-five reeds have no damper, as on the real instrument. Sustain (CC64) is supported.</p>
+
+      <h2 id="porting">Porting notes</h2>
+      <h3>What is a direct port</h3>
+      <ul>
+        <li>Per-note mode ratios, amplitudes, decay rates, detune and variation (OpenWurli
+        <code>tables</code> and <code>variation</code>).</li>
+        <li>Hammer dwell attenuation and onset ramp, including the velocity curve.</li>
+        <li>The pickup overlap law tables (four keyboard sections, 2D field solve), band
+        polarity, rest offset, sensitivity and node recursion.</li>
+        <li>Attack noise burst: LCG, band-pass and exponential envelope.</li>
+      </ul>
+      <p>The fixed-point voice was validated against OpenWurli's float voice before any FX
+      were added: C4 at velocity 100 matched the reference peak to 0.2 dB, the spectral bands
+      from 20 Hz to 20 kHz to 0.3 dB, and the decay curve to 0.2 dB over two seconds.</p>
+
+      <h3>What is behavioural in v0.1</h3>
+      <ul>
+        <li><strong>Preamp, power amp and speaker</strong> are calibrated behavioural stages,
+        not the nine-node MNA/Newton solver. The transfer, coupling, crossover and cabinet
+        shape are matched; the exact nonlinear circuit is v0.2.</li>
+        <li><strong>Tremolo</strong> uses the real rate, LDR attack/release and depth law, but
+        a sine Twin-T approximation instead of the generated circuit oscillator.</li>
+        <li><strong>MLP per-note corrections</strong> are off. They are an optional research
+        layer trained on recordings; the underlying physics does not depend on them.</li>
+        <li><strong>64 voices</strong> become 8; <strong>2× oversampling</strong> is omitted
+        in v0.1. Both are CPU decisions for the 360 MHz target and are visible in the plan.</li>
+        <li><strong>44.1 kHz only.</strong> The table generator is rate-aware; v0.2 can emit a
+        48 kHz set if the USB path needs it.</li>
+      </ul>
+
+      <h2 id="calibration">Calibration and table generation</h2>
+      <p>All physics data is generated from a pinned OpenWurli commit, not transcribed by
+      hand. The generator is a small Rust crate that depends on <code>openwurli-dsp</code>:</p>
+      <pre>cd tools/tablegen
+cargo run --release &gt; ../../engine/src/wurli_tables.c</pre>
+      <p>The generated file is committed so normal builds need neither Rust nor network access.
+      It contains 64 notes × (7 modes, phase/rotation, decay, damper, velocity drive, output
+      gain), four pickup laws, the shared curves and the amplifier/speaker coefficients.
+      Regenerating it after an OpenWurli calibration change is the whole update process for
+      the voice.</p>
+      <p class="note">The generated tables are derivative data of OpenWurli (GPL-3.0-or-later)
+      and carry the same licence. The generator is in <code>tools/tablegen</code>; the pin is
+      in its <code>Cargo.toml</code>.</p>
+
+      <h2 id="build">Build and test</h2>
+      <h3>Host</h3>
+      <pre># engine test suite (assert-based, no framework)
+cc -O2 -Iengine/include \
+   engine/src/wurli_engine.c engine/src/wurli_tables.c \
+   engine/tests/test_engine.c -lm -o build/test_engine
+./build/test_engine
+
+# offline renderer
+cc -O2 -Iengine/include \
+   engine/src/wurli_engine.c engine/src/wurli_tables.c \
+   tools/render/render.c -lm -o build/reed
+./build/reed note --note 60 --vel 100 --out note.wav
+./build/reed midi --in song.mid --out song.wav
+./build/reed demo --out demo.wav
+./build/reed bench</pre>
+      <p>The tests cover silence, level and velocity, determinism, pitch (+/−25 cents),
+      damper, sustain, polyphony/stealing, 30 s stability and a fixed-point golden hash.</p>
+
+      <h3>Browser emulator</h3>
+      <pre>./web/build.sh
+python3 -m http.server -d web 8080
+# http://localhost:8080/try/</pre>
+      <p><code>web/build.sh</code> compiles the same C to a standalone wasm32 module with
+      Emscripten's clang and <code>wasm-ld</code>. The module imports nothing; the worklet
+      receives the bytes from the page and instantiates them.</p>
+
+      <h3>MIDI file support</h3>
+      <p>The renderer reads Standard MIDI Files (format 0/1, PPQ timing, tempo changes, note
+      on/off and CC64). It ignores program changes, pitch bend and other controllers. The
+      output is 16-bit stereo at 44.1 kHz, both channels carrying the mono model.</p>
+
+      <h2 id="firmware">Firmware status</h2>
+      <p>The firmware application is in <code>firmware/</code> and targets the FM-1 through
+      <code>felucca-bsp</code>:</p>
+      <ul>
+        <li>ALNK0 I2S audio, 128-frame half buffers (2.9 ms), the engine rendered in the DMA
+        interrupt.</li>
+        <li>41-key scan (27 notes + 14 buttons), 7 encoders, LCD, LEDs, USB MIDI and TRS MIDI.</li>
+        <li>Menu/parameter layer: volume, tremolo, drive, speaker, tune, panic, MIDI channel.</li>
+        <li>Flash settings and the Felucca-compatible update loader are planned for the first
+        hardware release.</li>
+      </ul>
+      <p class="note"><strong>Alpha.</strong> The BSP integration compiles in the project's
+      host-simulation mode, but no image has been validated on a physical FM-1 yet. No web
+      installer is published. Do not flash an untested image. Build prerequisites and the
+      JieLi toolchain setup are in <code>BUILDING.md</code>; recovery is the Felucca/transporter
+      path described there.</p>
+      <p>The FM-1 pin map, key ids and board facts are not duplicated here: they are the facts
+      <code>felucca-bsp/boards/fm1</code> establishes. This project consumes that layer rather
+      than re-deriving it.</p>
+
+      <h2 id="emulator">Emulator</h2>
+      <p>The emulator is not a sample player or a recording: it is the shipping engine compiled
+      to WebAssembly. Controls:</p>
+      <ul>
+        <li>Click <strong>Power</strong>, then play the 27 keys (F3–G5).</li>
+        <li>Computer keyboard: <code>A W S E D F T G Y H U J K</code>; octave <code>Z/X</code>;
+        sustain <code>Space</code>.</li>
+        <li>A connected MIDI keyboard is used after power-on (Web MIDI, Chrome/Edge).</li>
+        <li>Sliders map to the same engine parameters as the firmware: volume, tremolo, drive,
+        speaker character and tune.</li>
+      </ul>
+      <p>Known limits: the browser audio device may run at 48 kHz and resample; the engine is
+      44.1 kHz. The monitor speakers/headphones colour the sound, as always. Reverb is not part
+      of the model.</p>
+
+      <h2 id="plan">Plan</h2>
+      <table>
+        <tr><th>Release</th><th>Scope</th></tr>
+        <tr><td>v0.1</td><td>Fixed-point voice, behavioural chain, host tests, renderer, WASM
+        emulator, site, docs, firmware skeleton. <em>This tree.</em></td></tr>
+        <tr><td>v0.2</td><td>Exact preamp/power-amp circuit solver (fixed point), 2× oversampling,
+        A/B regression against OpenWurli renders, 48 kHz.</td></tr>
+        <tr><td>v0.3</td><td>Hardware bring-up: audio, keys/velocity, encoders, LCD, USB MIDI;
+        ROM budget and CPU measurements on a real FM-1; 8–12 voice tuning.</td></tr>
+        <tr><td>v0.4</td><td>Flash settings, presets, update loader, web installer, first
+        signed/validated image.</td></tr>
+        <tr><td>v1.0</td><td>Calibration listening pass, factory presets, recovery docs, release
+        artifacts.</td></tr>
+      </table>
+
+      <h2 id="licence">Licence and credits</h2>
+      <p>Reed is <strong>GPL-3.0-only</strong>. The generated fixed-point tables are derived
+      from <a href="https://github.com/hal0zer0/openwurli">OpenWurli</a> (GPL-3.0-or-later).
+      The board layer is <a href="https://github.com/hugelton/felucca-bsp">felucca-bsp</a>
+      (MPL-2.0), compatible with GPL. Felucca itself is GPL-3.0. See <code>LICENSING.md</code>,
+      <code>CREDITS.md</code> and the licence texts in <code>LICENSES/</code>.</p>
+      <p>OpenWurli's research and calibration (reed physics, pickup field solve, circuit
+      characterisation) are the foundation of the voice. Felucca and felucca-bsp established
+      the FM-1 hardware facts and the update path. Neither project endorses this one.</p>
+    </main>
+  </div>
+
+  <footer>
+    <div class="cols">
+      <div><strong>Reed</strong> — unofficial, not affiliated with M-VAVE or JieLi.</div>
+      <div><a href="index.html">Home</a> · <a href="try/index.html">Emulator</a></div>
+    </div>
+  </footer>
+</div>
+</body>
+</html>

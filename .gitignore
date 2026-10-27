@@ -1,0 +1,9 @@
+build/
+firmware/build/
+tools/tablegen/target/
+node_modules/
+__pycache__/
+*.pyc
+.DS_Store
+*.wav
+!web/assets/*.wav

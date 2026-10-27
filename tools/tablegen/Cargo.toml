@@ -1,0 +1,12 @@
+[workspace]
+
+[package]
+name = "reed-tablegen"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "GPL-3.0-only"
+description = "Generates the fixed-point parameter tables for the Reed FM-1 engine from OpenWurli's physics."
+
+[dependencies]
+openwurli-dsp = { git = "https://github.com/hal0zer0/openwurli", rev = "531680b5b49eb4a734a8d8ef7a9c13cb83cf79f9" }

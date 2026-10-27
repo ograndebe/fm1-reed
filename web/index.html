@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reed — a Wurlitzer 200A for the M-VAVE FM-1</title>
+<meta name="description" content="A physical model of the Wurlitzer 200A, ported to a fixed-point engine for the M-VAVE FM-1. Open source, no samples.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="nav">
+    <a class="brand" href="index.html"><strong>REED</strong><span>FM-1 · Wurlitzer 200A</span></a>
+    <nav>
+      <a href="try/index.html">Emulator</a>
+      <a href="docs.html">Docs</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/hal0zer0/openwurli" target="_blank" rel="noopener">OpenWurli ↗</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <div>
+      <div class="kicker">Custom firmware · physical modelling · open source</div>
+      <h1>A Wurlitzer 200A,<br>rebuilt in fixed point.</h1>
+      <p class="lead">
+        Reed is a from-scratch firmware project for the M-VAVE FM-1. The voice is a
+        fixed-point port of <strong>OpenWurli</strong>'s modal reed, electrostatic pickup
+        and hammer models. No samples, no impulse responses: seven reeds modes, a field-solved
+        pickup law and the 200A's amplifier character, running on a 32-bit JieLi AC79.
+      </p>
+      <div class="actions">
+        <a class="btn primary" href="try/index.html">Play the browser emulator →</a>
+        <a class="btn" href="docs.html">Read the plan</a>
+        <a class="btn" href="assets/demo.mp3">Hear a demo</a>
+      </div>
+    </div>
+    <aside class="hero-card" aria-label="Project status">
+      <dl>
+        <dt><span class="dot"></span>Engine</dt><dd>v0.1 · working</dd>
+        <dt><span class="dot"></span>Browser</dt><dd>WASM · working</dd>
+        <dt><span class="dot wip"></span>Firmware</dt><dd>alpha · bring-up</dd>
+        <dt><span class="dot todo"></span>Installer</dt><dd>planned</dd>
+        <dt>Voices</dt><dd>8 (64 in OpenWurli)</dd>
+        <dt>Rate</dt><dd>44.1 kHz · Q20</dd>
+        <dt>Licence</dt><dd>GPL-3.0</dd>
+      </dl>
+    </aside>
+  </section>
+
+  <section class="section">
+    <div class="player">
+      <button id="play-demo" aria-label="Play demo">▶</button>
+      <div class="meta">
+        <strong>“Four bars” — engine demo</strong><br>
+        Rendered offline by the same C engine. No samples; 8 voices through the model chain.
+        <audio id="demo" controls preload="none" src="assets/demo.mp3"></audio>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>What is inside</h2>
+    <div class="grid">
+      <div class="card">
+        <div class="num">01 / REED</div>
+        <h3>Seven-mode reed</h3>
+        <p>Euler–Bernoulli mode ratios with tip mass, per-note inharmonicity, damping and
+        the velocity-dependent hammer dwell. Quadrature oscillators, no per-sample sines.</p>
+      </div>
+      <div class="card">
+        <div class="num">02 / PICKUP</div>
+        <h3>Electrostatic pickup</h3>
+        <p>A 2D field-solved capacitance-vs-overlap law, one moving reed against a fixed
+        plate node. The nonlinearity is in the source, exactly as in the 200A.</p>
+      </div>
+      <div class="card">
+        <div class="num">03 / HAMMER</div>
+        <h3>Hammer and damper</h3>
+        <p>Gaussian contact dwell, register-dependent onset, attack noise and the
+        progressive felt damper. High modes die first.</p>
+      </div>
+      <div class="card">
+        <div class="num">04 / AMP</div>
+        <h3>200A character</h3>
+        <p>Input coupling, preamp asymmetry, Twin-T/LDR tremolo, volume pot, feedback
+        shelf, crossover distortion and the 4×8″ speaker. Calibrated against OpenWurli.</p>
+      </div>
+      <div class="card">
+        <div class="num">05 / FIXED POINT</div>
+        <h3>No FPU required</h3>
+        <p>Q30 reed, Q24 gain staging, Q28 biquads, 32×32→64 MACs. The same C99 source
+        builds for the AC79 and for WebAssembly, bit-identically.</p>
+      </div>
+      <div class="card">
+        <div class="num">06 / HARDWARE</div>
+        <h3>FM-1, not a computer</h3>
+        <p>The target is a 360 MHz pi32v2 with 8 voices, the FM-1 keybed, encoders and
+        LCD. The firmware layer builds on Felucca's BSP; the emulator is the reference.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Signal path</h2>
+    <div class="flow" aria-label="Signal flow">
+      <span>7-mode reed</span><i>→</i>
+      <span>pickup overlap law</span><i>→</i>
+      <span>hammer / damper</span><i>→</i>
+      <span>preamp</span><i>→</i>
+      <span>LDR tremolo</span><i>→</i>
+      <span>volume pot</span><i>→</i>
+      <span>power amp</span><i>→</i>
+      <span>speaker</span><i>→</i>
+      <span>Q20 out</span>
+    </div>
+    <p style="margin-top:1rem;max-width:70ch">
+      The voice path is a direct fixed-point port of OpenWurli's physics. The amplifier
+      and speaker are a calibrated behavioural model in v0.1; the exact circuit solver
+      is the next milestone. See <a href="docs.html#porting">the porting notes</a> for what
+      is exact and what is approximated.
+    </p>
+  </section>
+
+  <section class="section" id="install">
+    <h2>Install on hardware</h2>
+    <table class="status">
+      <tr><th>Stage</th><th>Status</th><th>What it means</th></tr>
+      <tr><td>Desktop engine</td><td><span class="dot"></span>working</td><td>Offline WAV renderer and host test suite.</td></tr>
+      <tr><td>Browser emulator</td><td><span class="dot"></span>working</td><td>WASM in an AudioWorklet; play it above.</td></tr>
+      <tr><td>FM-1 firmware</td><td><span class="dot wip"></span>alpha</td><td>BSP integration and UI written; not yet validated on a unit.</td></tr>
+      <tr><td>Web installer</td><td><span class="dot todo"></span>planned</td><td>Ships with the first hardware-validated image. No firmware is published yet.</td></tr>
+    </table>
+    <p style="margin-top:1rem">
+      No download is offered before the firmware is tested on real hardware. The
+      <a href="docs.html#build">build guide</a> has the current bring-up instructions and the
+      recovery path. Installing custom firmware is always at your own risk.
+    </p>
+  </section>
+
+  <section class="section">
+    <h2>Built on</h2>
+    <div class="grid">
+      <div class="card">
+        <h3><a href="https://github.com/hal0zer0/openwurli" target="_blank" rel="noopener">OpenWurli</a></h3>
+        <p>The physics, calibration and the Wurlitzer 200A research. GPL-3.0.</p>
+      </div>
+      <div class="card">
+        <h3><a href="https://github.com/hugelton/Felucca" target="_blank" rel="noopener">Felucca</a></h3>
+        <p>The FM-1 firmware architecture, UI and the proof that a custom firmware fits. GPL-3.0.</p>
+      </div>
+      <div class="card">
+        <h3><a href="https://github.com/hugelton/felucca-bsp" target="_blank" rel="noopener">felucca-bsp</a></h3>
+        <p>The JieLi AC79 board layer: audio DMA, key scan, LCD, USB, update loader. MPL-2.0.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="cols">
+      <div>
+        <strong>Reed</strong> — unofficial. Not affiliated with or endorsed by M-VAVE or JieLi.<br>
+        M-VAVE and FM-1 are trademarks of their respective owners.
+      </div>
+      <div>
+        <a href="docs.html">Documentation</a> ·
+        <a href="try/index.html">Emulator</a> ·
+        <a href="https://github.com/hal0zer0/openwurli" target="_blank" rel="noopener">OpenWurli</a> ·
+        <a href="https://github.com/hugelton/Felucca" target="_blank" rel="noopener">Felucca</a>
+      </div>
+    </div>
+    <p style="margin-top:1.2rem">GPL-3.0-only. The fixed-point tables are derived from OpenWurli; the board layer is MPL-2.0. See LICENSING.md in the source tree.</p>
+  </footer>
+</div>
+<script>
+  document.getElementById('play-demo').addEventListener('click', () => {
+    const a = document.getElementById('demo');
+    if (a.paused) { a.play(); document.getElementById('play-demo').textContent = '❚❚'; }
+    else { a.pause(); document.getElementById('play-demo').textContent = '▶'; }
+  });
+  document.getElementById('demo').addEventListener('ended', () => {
+    document.getElementById('play-demo').textContent = '▶';
+  });
+</script>
+</body>
+</html>

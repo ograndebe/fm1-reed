@@ -1,0 +1,3 @@
+[submodule "bsp/felucca-bsp"]
+	path = bsp/felucca-bsp
+	url = https://github.com/hugelton/felucca-bsp
