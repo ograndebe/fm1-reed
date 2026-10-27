@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 CC ?= cc
-CFLAGS ?= -O2 -std=c99 -Wall -Wextra -Iengine/include
+WR_MAX_VOICES ?= 8
+CFLAGS ?= -O2 -std=c99 -Wall -Wextra -Iengine/include -DWR_MAX_VOICES=$(WR_MAX_VOICES)
 LDLIBS ?= -lm
 BUILD := build
 ENGINE := engine/src/wurli_engine.c engine/src/wurli_tables.c

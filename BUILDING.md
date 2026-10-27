@@ -24,6 +24,7 @@ git submodule update --init --recursive
 make test          # build + run engine/tests/test_engine.c
 make reed          # build build/reed
 make bench         # build + run the 8-voice benchmark
+make WR_MAX_VOICES=10 test   # experiment with a larger polyphony budget
 ```
 
 Manual equivalent:
@@ -65,7 +66,7 @@ python3 -m http.server -d web 8080
 
 `web/build.sh` compiles `engine/src/*.c` and `web/wasm_glue.c` with Emscripten's
 clang into objects, then links a standalone wasm32 module with Emscripten's
-`wasm-ld`. The module imports nothing: the AudioWorklet receives the bytes from
+`wasm-ld`. Set `WR_MAX_VOICES=10` to experiment with a larger budget. The module imports nothing: the AudioWorklet receives the bytes from
 the page and calls `WebAssembly.instantiate`. There is no JS runtime, no
 Emscripten glue file.
 
@@ -90,7 +91,9 @@ the script runs each tool in `debian:bookworm-slim` under Docker
 (`--platform linux/amd64`), as Felucca's build does. Docker Desktop must be
 running and the repository must be under a shared folder such as `/Users`.
 
-Output: `firmware/build/reed.bin` (~84 KB) and the ELF/symbols.
+Output: `firmware/build/reed.bin` (~84 KB) and the ELF/symbols. The voice budget
+is 8 by default; `WR_MAX_VOICES=10 ./firmware/build.sh` builds a 10-voice image
+for timing experiments.
 
 **This is not an installable release.** There is no OTA entry, no loader package
 and no hardware validation. To flash an alpha you need the stock/UBOOT path and a

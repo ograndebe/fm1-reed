@@ -57,8 +57,9 @@ else
     esac
 fi
 
+VOICES="${WR_MAX_VOICES:-8}"
 CFLAGS="-target pi32v2 -Os -ffunction-sections -fno-builtin -Wall -Wno-unused-function \
- -Iengine/include -I$BSP_REL/chip -I$BSP_REL/boards/fm1"
+ -DWR_MAX_VOICES=$VOICES -Iengine/include -I$BSP_REL/chip -I$BSP_REL/boards/fm1"
 
 run "$CC" -target pi32v2 -c "$BSP_REL/chip/crt0.S" -o "$OUT/crt0.o"
 run "$CC" -target pi32v2 -c "$BSP_REL/chip/fm1_vec.S" -o "$OUT/vec.o"

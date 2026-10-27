@@ -9,7 +9,8 @@ OUT=web/try/wurli.wasm
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
-CFLAGS="-O3 -nostdlib -fno-builtin -DNDEBUG -Iengine/include"
+VOICES="${WR_MAX_VOICES:-8}"
+CFLAGS="-O3 -nostdlib -fno-builtin -DNDEBUG -DWR_MAX_VOICES=$VOICES -Iengine/include"
 emcc $CFLAGS -c engine/src/wurli_engine.c -o "$TMP/engine.o"
 emcc $CFLAGS -c engine/src/wurli_tables.c -o "$TMP/tables.o"
 emcc $CFLAGS -c web/wasm_glue.c -o "$TMP/glue.o"
