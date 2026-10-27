@@ -417,15 +417,14 @@ int main(int argc, char **argv)
         for (int i = 0; i < 8; i++)
             wr_note_on(&e, notes[i], 110);
         int32_t buf[512];
-        struct timespec t0, t1;
-        clock_gettime(CLOCK_MONOTONIC, &t0);
+        clock_t t0 = clock();
         uint64_t samples = 0;
         while (samples < SR * 30ull) {
             wr_render(&e, buf, 512);
             samples += 512;
         }
-        clock_gettime(CLOCK_MONOTONIC, &t1);
-        double secs = (double)(t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1e9;
+        clock_t t1 = clock();
+        double secs = (double)(t1 - t0) / CLOCKS_PER_SEC;
         printf("8 voices, 30 s audio in %.3f s: %.1fx realtime, %.1f ns/sample\n",
                secs, 30.0 / secs, secs * 1e9 / (double)samples);
         return 0;
