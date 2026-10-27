@@ -4,35 +4,90 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   host:
     name: host (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
       - name: Build and run engine tests
         run: make test
       - name: Build renderer and benchmark
         run: make reed && ./build/reed bench
-      - name: Render smoke test
-        run: ./build/reed note --note 60 --vel 100 --seconds 1 --out /tmp/reed.wav
+      - name: Render and check a WAV
+        run: |
+          ./build/reed note --note 60 --vel 100 --seconds 1 --out /tmp/reed.wav
+          python3 tests/check_wav.py /tmp/reed.wav 44100
+
+  sanitizers:
+    name: ASan + UBSan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build with sanitizers
+        run: |
+          mkdir -p build
+          cc -O1 -g -std=c99 -Wall -Wextra -fsanitize=address,undefined \
+             -fno-omit-frame-pointer -Iengine/include \
+             engine/src/wurli_engine.c engine/src/wurli_tables.c \
+             engine/tests/test_engine.c -lm -o build/test_san
+      - name: Run with sanitizers
+        env:
+          ASAN_OPTIONS: detect_leaks=0
+          UBSAN_OPTIONS: halt_on_error=1
+        run: ./build/test_san
+
+  capacity:
+    name: 32-voice capacity
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and test with a 32-voice array
+        run: |
+          make clean
+          make WR_MAX_VOICES=32 test
+          make WR_MAX_VOICES=32 reed
+          ./build/reed bench
+
+  tablegen:
+    name: tablegen drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tools/tablegen -> target
+      - name: Regenerate and compare
+        run: |
+          cd tools/tablegen
+          cargo run --release > /tmp/wurli_tables.c
+          diff -u ../../engine/src/wurli_tables.c /tmp/wurli_tables.c
 
   wasm:
     name: wasm
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
       - uses: mymindstorm/setup-emsdk@v14
         with:
-          version: latest
+          version: 6.0.13
       - name: Build the emulator engine
         run: ./web/build.sh
       - name: Node smoke test

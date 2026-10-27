@@ -444,7 +444,7 @@ static void control_block(wr_engine_t *e)
 
 static inline int32_t chain_sample(wr_engine_t *e, int32_t xq20)
 {
-    int32_t x = xq20 << 4; /* Q20 -> Q24, volts */
+    int32_t x = xq20 * 16; /* Q20 -> Q24, volts (multiplication: the value may be negative) */
 
     /* Preamp input coupling: 22 nF into ~21.5k, ~336 Hz. */
     int32_t lp = e->pre_lp;

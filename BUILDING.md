@@ -114,10 +114,17 @@ changed.
 
 ## CI
 
-`.github/workflows/ci.yml` builds and tests the host engine on Linux and macOS.
+`.github/workflows/ci.yml` runs:
+
+- host tests on Linux and macOS, plus a WAV render check and the benchmark;
+- ASan + UBSan on the engine test suite;
+- a 32-voice capacity build (`WR_MAX_VOICES=32`);
+- a tablegen drift check (regenerates from the pinned OpenWurli commit and diffs);
+- the standalone wasm build and the Node smoke test.
+
 `.github/workflows/pages.yml` builds the wasm and publishes `web/` to GitHub
-Pages. The firmware build is not in CI: it needs the proprietary-adjacent JieLi
-toolchain and Docker, and the image is not hardware-validated.
+Pages. The firmware build is not in CI: it needs the JieLi toolchain, which is not
+redistributed here, and the image is not hardware-validated.
 
 ## Troubleshooting
 

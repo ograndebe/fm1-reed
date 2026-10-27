@@ -55,7 +55,8 @@ absent.
 ## Phase 2 — v0.2, exact circuit chain
 
 **Goal:** replace the behavioural preamp/power-amp/speaker with the circuit model,
-in fixed point, and add 2× oversampling.
+in fixed point, and add 2× oversampling. The polyphony/quality analysis is in
+[POLYPHONY.md](POLYPHONY.md).
 
 Work:
 

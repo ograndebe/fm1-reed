@@ -13,20 +13,7 @@ make test
 echo "== renderer =="
 make reed
 ./build/reed note --note 60 --vel 100 --seconds 1 --out "$TMP/c4.wav" >/dev/null
-python3 - "$TMP/c4.wav" <<'PY'
-import struct, sys, wave
-p = sys.argv[1]
-w = wave.open(p)
-assert w.getframerate() == 44100 and w.getnchannels() == 2 and w.getsampwidth() == 2, w.getparams()
-n = w.getnframes()
-d = w.readframes(n)
-w.close()
-assert n == 44100, n
-s = struct.unpack("<%dh" % (len(d) // 2), d)
-peak = max(abs(v) for v in s) / 32768.0
-assert peak > 0.005, peak
-print("c4.wav: %d frames, peak %.3f" % (n, peak))
-PY
+python3 tests/check_wav.py "$TMP/c4.wav" 44100
 
 echo "== wasm =="
 if command -v emcc >/dev/null 2>&1; then

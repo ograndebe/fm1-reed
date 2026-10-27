@@ -17,13 +17,12 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
       - uses: mymindstorm/setup-emsdk@v14
         with:
-          version: latest
+          version: 6.0.13
       - name: Build the WebAssembly engine
         run: ./web/build.sh
       - name: Upload the static site
@@ -34,6 +33,7 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

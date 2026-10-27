@@ -132,6 +132,7 @@ Do not flash it as a first test. Read [firmware/README.md](firmware/README.md) a
 - [docs/PLAN.md](docs/PLAN.md) — phased plan and release scope
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — engine structure, data flow, Q formats
 - [docs/PORTING.md](docs/PORTING.md) — what is exact, what is behavioural, calibration
+- [docs/POLYPHONY.md](docs/POLYPHONY.md) — advanced polyphony/quality profiles and hardware risks
 - [docs/HARDWARE.md](docs/HARDWARE.md) — FM-1 facts, audio/timer/interrupt layout
 - [BUILDING.md](BUILDING.md) — host, emulator and firmware builds, recovery
 - [firmware/README.md](firmware/README.md) — wiring, UI, current alpha limits
